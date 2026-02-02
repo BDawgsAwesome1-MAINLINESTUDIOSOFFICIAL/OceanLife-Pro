@@ -79,6 +79,15 @@ color: rgba(255, 255, 255, 0.7);
 margin-top: 10px;
 }
 
+.loading-tip {
+font-size: 12px;
+color: rgba(255, 255, 255, 0.5);
+margin-top: 24px;
+max-width: 280px;
+text-align: center;
+font-style: italic;
+}
+
 .progress-bar {
 width: 300px;
 height: 4px;
@@ -452,11 +461,12 @@ margin: 8px 12px;
 <div class="wave"></div>
 </div>
 <div class="loading-text">🏖️ OceanLife Pro</div>
-<div class="loading-subtext">Initializing simulation...</div>
+<div class="loading-subtext">Photorealistic Beach Simulation</div>
 <div class="progress-bar">
 <div class="progress-fill" id="progress"></div>
 </div>
 <div class="loading-subtext" id="load-status">Starting...</div>
+<div class="loading-tip" id="loading-tip"></div>
 </div>
 </div>
 
@@ -475,7 +485,7 @@ margin: 8px 12px;
 <div class="panel-toggle" onclick="togglePanel()"></div>
 
 <h1>🏖️ OceanLife Pro</h1>
-<div class="subtitle">Photorealistic Beach Simulation v2.0</div>
+<div class="subtitle">Photorealistic Beach Simulation v3.0</div>
 
 <div class="section">
 <div class="section-title">🎬 Rendering Mode</div>
@@ -560,7 +570,7 @@ Use Particle mode for older devices
 
 <!-- Credits -->
 <div id="credits">
-<strong>OceanLife Pro</strong> - Photorealistic Beach Simulation | Built with Three.js
+<strong>OceanLife Pro</strong> — Drag to orbit · Right-click for menu · Built with Three.js
 </div>
 
 <!-- Context Menu -->
@@ -602,7 +612,9 @@ let scene, camera, renderer, controls;
 let ocean, people = [], beachObjects = [];
 let particleSystem;
 let waterParticles = [];
-let sunLight, skyLight;
+let sunLight, skyLight, ambientLight;
+let birdsSystem;
+let skyMesh;
 
 // ==========================================
 // SCENE SETUP
@@ -617,11 +629,14 @@ scene.background = new THREE.Color(0x87CEEB);
 camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 2000);
 camera.position.set(0, 25, 80);
 
-renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
+renderer.outputEncoding = THREE.sRGBEncoding;
 document.body.appendChild(renderer.domElement);
 
 controls = new THREE.OrbitControls(camera, renderer.domElement);
@@ -641,24 +656,75 @@ console.log('Scene initialized ✓');
 function setupLighting() {
 console.log('Setting up lighting...');
 
-const ambient = new THREE.AmbientLight(0x404060, 0.6);
-scene.add(ambient);
+ambientLight = new THREE.AmbientLight(0x404060, 0.6);
+scene.add(ambientLight);
 
 sunLight = new THREE.DirectionalLight(0xffffff, 1.5);
 sunLight.position.set(50, 80, 30);
 sunLight.castShadow = true;
 sunLight.shadow.mapSize.width = 2048;
 sunLight.shadow.mapSize.height = 2048;
-sunLight.shadow.camera.left = -100;
-sunLight.shadow.camera.right = 100;
-sunLight.shadow.camera.top = 100;
-sunLight.shadow.camera.bottom = -100;
+sunLight.shadow.camera.left = -150;
+sunLight.shadow.camera.right = 150;
+sunLight.shadow.camera.top = 150;
+sunLight.shadow.camera.bottom = -150;
 scene.add(sunLight);
 
 skyLight = new THREE.HemisphereLight(0x87CEEB, 0xf0e68c, 0.6);
 scene.add(skyLight);
 
+scene.fog = new THREE.FogExp2(0x87CEEB, 0.015);
+updateTimeOfDayLighting();
+
 console.log('Lighting setup ✓');
+}
+
+function updateTimeOfDayLighting() {
+const t = CONFIG.timeOfDay;
+const sunMult = CONFIG.sunIntensity;
+
+// Sun position: 0 = midnight, 6 = sunrise east, 12 = noon, 18 = sunset west
+const sunAngle = (t / 24) * Math.PI * 2 - Math.PI / 2;
+const radius = 180;
+const sunY = Math.sin(sunAngle) * radius;
+const sunX = Math.cos(sunAngle) * radius;
+sunLight.position.set(sunX, Math.max(5, sunY), 80);
+sunLight.target.position.set(0, 0, 0);
+
+// Sun color & intensity: warm at dawn/dusk, white at noon, dim at night
+const isDay = sunY > -20;
+let sunColor, sunIntensity, ambientColor, ambientIntensity, skyColor, groundColor, fogColor;
+
+if (!isDay) {
+sunColor = new THREE.Color(0x223366);
+sunIntensity = 0.15 * sunMult;
+ambientColor = 0x0a1628;
+ambientIntensity = 0.4;
+skyColor = 0x0a1628;
+groundColor = 0x050810;
+fogColor = 0x0a1628;
+} else {
+const heightNorm = (sunY + 20) / 140;
+sunIntensity = (0.4 + heightNorm * 1.1) * sunMult;
+const warmth = Math.exp(-Math.pow((t - 12) / 4, 2));
+sunColor = new THREE.Color().setHSL(0.08 + (1 - warmth) * 0.05, 0.3, 0.95);
+ambientColor = new THREE.Color().setHSL(0.6 - warmth * 0.1, 0.4, 0.5).getHex();
+ambientIntensity = 0.35 + heightNorm * 0.35;
+skyColor = new THREE.Color().setHSL(0.55 + warmth * 0.08, 0.5, 0.65).getHex();
+groundColor = new THREE.Color().setHSL(0.12, 0.4, 0.5).getHex();
+fogColor = new THREE.Color().setHSL(0.55 + warmth * 0.06, 0.4, 0.6).getHex();
+}
+
+sunLight.color.copy(sunColor);
+sunLight.intensity = sunIntensity;
+ambientLight.color.setHex(ambientColor);
+ambientLight.intensity = ambientIntensity;
+skyLight.color.setHex(skyColor);
+skyLight.groundColor.setHex(groundColor);
+skyLight.intensity = 0.5 + (isDay ? 0.3 : 0);
+scene.background = new THREE.Color(fogColor);
+scene.fog.color.setHex(fogColor);
+scene.fog.density = isDay ? 0.012 : 0.025;
 }
 
 // ==========================================
@@ -788,15 +854,17 @@ const geometry = new THREE.PlaneGeometry(150, 150, 64, 64);
 geometry.rotateX(-Math.PI / 2);
 
 const material = new THREE.MeshPhysicalMaterial({
-color: 0x0077be,
+color: 0x006994,
 metalness: 0,
-roughness: 0.05,
-transmission: 0.95,
-thickness: 2,
+roughness: 0.02,
+transmission: 0.98,
+thickness: 1.5,
 clearcoat: 1,
-clearcoatRoughness: 0.03,
+clearcoatRoughness: 0.01,
+ior: 1.33,
+reflectivity: 0.5,
 transparent: true,
-opacity: 0.9,
+opacity: 0.92,
 side: THREE.DoubleSide
 });
 
@@ -855,7 +923,7 @@ console.log('Creating beach...');
 
 const sandGeo = new THREE.PlaneGeometry(200, 100);
 sandGeo.rotateX(-Math.PI / 2);
-const sandMat = new THREE.MeshStandardMaterial({ color: 0xf4e4c1, roughness: 0.95 });
+const sandMat = new THREE.MeshStandardMaterial({ color: 0xe8d4b8, roughness: 0.92 });
 const sand = new THREE.Mesh(sandGeo, sandMat);
 sand.position.set(0, -0.5, -60);
 sand.receiveShadow = true;
@@ -863,11 +931,48 @@ scene.add(sand);
 
 const seabedGeo = new THREE.PlaneGeometry(200, 200);
 seabedGeo.rotateX(-Math.PI / 2);
-const seabedMat = new THREE.MeshStandardMaterial({ color: 0xc9b897 });
+const seabedMat = new THREE.MeshStandardMaterial({ color: 0x8b7355 });
 const seabed = new THREE.Mesh(seabedGeo, seabedMat);
 seabed.position.y = -8;
 seabed.receiveShadow = true;
 scene.add(seabed);
+
+// Palm trees
+const palmPositions = [[-45, -0.3, -55], [50, -0.3, -48], [-55, -0.3, -35], [35, -0.3, -58]];
+palmPositions.forEach(([x, y, z]) => {
+const palm = new THREE.Group();
+const trunkGeo = new THREE.CylinderGeometry(0.4, 0.7, 8, 8);
+const trunkMat = new THREE.MeshStandardMaterial({ color: 0x8b6914, roughness: 0.9 });
+const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+trunk.castShadow = true;
+trunk.receiveShadow = true;
+palm.add(trunk);
+const leavesGeo = new THREE.ConeGeometry(3, 4, 8);
+const leavesMat = new THREE.MeshStandardMaterial({ color: 0x228b22, roughness: 0.8 });
+const leaves = new THREE.Mesh(leavesGeo, leavesMat);
+leaves.position.y = 4.5;
+leaves.castShadow = true;
+palm.add(leaves);
+palm.position.set(x, y, z);
+palm.rotation.y = Math.random() * Math.PI * 2;
+scene.add(palm);
+beachObjects.push(palm);
+});
+
+// Rocks
+const rockPositions = [[-30, -0.2, -50], [25, -0.3, -52], [0, -0.4, -58], [-15, -0.2, -45]];
+rockPositions.forEach(([x, y, z], i) => {
+const rockGeo = new THREE.DodecahedronGeometry(0.8 + Math.random() * 0.8, 0);
+const rockMat = new THREE.MeshStandardMaterial({ color: 0x6b6b6b, roughness: 0.95 });
+const rock = new THREE.Mesh(rockGeo, rockMat);
+rock.position.set(x, y, z);
+rock.rotation.set(Math.random() * 0.3, Math.random() * Math.PI * 2, Math.random() * 0.2);
+rock.scale.setScalar(0.8 + Math.random() * 0.6);
+rock.castShadow = true;
+rock.receiveShadow = true;
+scene.add(rock);
+beachObjects.push(rock);
+});
 
 console.log('Beach created ✓');
 }
@@ -1063,6 +1168,57 @@ document.getElementById('particleCount').textContent = activeCount;
 }
 
 // ==========================================
+// BIRDS
+// ==========================================
+
+class BirdsSystem {
+constructor() {
+this.birds = [];
+const count = 5;
+for (let i = 0; i < count; i++) {
+const group = new THREE.Group();
+const bodyGeo = new THREE.SphereGeometry(0.15, 6, 6);
+const bodyMat = new THREE.MeshBasicMaterial({ color: 0x333333 });
+const body = new THREE.Mesh(bodyGeo, bodyMat);
+group.add(body);
+const wingGeo = new THREE.SphereGeometry(0.08, 4, 4);
+const wing = new THREE.Mesh(wingGeo, bodyMat);
+wing.scale.set(2, 0.5, 1);
+wing.position.x = 0.1;
+group.add(wing);
+group.position.set(
+(Math.random() - 0.5) * 120,
+25 + Math.random() * 40,
+(Math.random() - 0.5) * 80
+);
+group.userData = {
+phase: Math.random() * Math.PI * 2,
+speed: 0.3 + Math.random() * 0.4,
+radius: 40 + Math.random() * 30,
+centerX: (Math.random() - 0.5) * 60,
+centerZ: (Math.random() - 0.5) * 40,
+wingPhase: Math.random() * Math.PI * 2
+};
+scene.add(group);
+this.birds.push(group);
+}
+}
+
+update(deltaTime) {
+this.birds.forEach(b => {
+const u = b.userData;
+u.phase += u.speed * deltaTime;
+b.position.x = u.centerX + Math.cos(u.phase) * u.radius;
+b.position.z = u.centerZ + Math.sin(u.phase) * u.radius;
+b.position.y = 25 + Math.sin(u.phase * 0.7) * 15;
+b.rotation.y = -u.phase;
+u.wingPhase += 15 * deltaTime;
+b.children[1].scale.x = 2 + Math.sin(u.wingPhase) * 0.5;
+});
+}
+}
+
+// ==========================================
 // MODE SWITCHING
 // ==========================================
 
@@ -1108,15 +1264,16 @@ updatePeople();
 
 function updateTimeOfDay(val) {
 CONFIG.timeOfDay = parseFloat(val);
-const labels = ['Night', 'Dawn', 'Morning', 'Noon', 'Afternoon', 'Evening'];
-const idx = Math.floor(val / 4);
+const labels = ['Midnight', 'Dawn', 'Morning', 'Noon', 'Afternoon', 'Sunset', 'Night'];
+const idx = Math.min(6, Math.floor(val / 4));
 document.getElementById('timeVal').textContent = labels[idx] || 'Night';
+updateTimeOfDayLighting();
 }
 
 function updateSunIntensity(val) {
 CONFIG.sunIntensity = parseFloat(val);
 document.getElementById('sunVal').textContent = val;
-if (sunLight) sunLight.intensity = parseFloat(val);
+updateTimeOfDayLighting();
 }
 
 function toggleAnimation(checked) {
@@ -1289,6 +1446,9 @@ lastTime = currentTime;
 if (ocean) ocean.update(deltaTime);
 people.forEach(person => person.update(deltaTime));
 if (particleSystem) particleSystem.update(deltaTime);
+if (birdsSystem) birdsSystem.update(deltaTime);
+
+updateTimeOfDayLighting();
 
 controls.update();
 renderer.render(scene, camera);
@@ -1305,11 +1465,21 @@ lastFpsUpdate = currentTime;
 // INITIALIZATION
 // ==========================================
 
+const LOADING_TIPS = [
+'Try the Sunset preset for golden hour.',
+'Right-click anywhere to add people or create waves.',
+'Use the Time of Day slider to see dawn and dusk.',
+'Particle mode runs better on older devices.',
+'Generate Big Wave for instant splashes!'
+];
+
 function init() {
 console.log('🏖️ Starting OceanLife Pro...');
 
 const progress = document.getElementById('progress');
 const status = document.getElementById('load-status');
+const tipEl = document.getElementById('loading-tip');
+if (tipEl) tipEl.textContent = LOADING_TIPS[Math.floor(Math.random() * LOADING_TIPS.length)];
 
 setTimeout(() => {
 progress.style.width = '20%';
@@ -1330,11 +1500,17 @@ createBeach();
 }, 500);
 
 setTimeout(() => {
-progress.style.width = '80%';
+progress.style.width = '75%';
 status.textContent = 'Creating water system...';
 ocean = new MeshWaterSystem();
 particleSystem = new SplashParticleSystem();
 }, 700);
+
+setTimeout(() => {
+progress.style.width = '88%';
+status.textContent = 'Adding birds...';
+birdsSystem = new BirdsSystem();
+}, 800);
 
 setTimeout(() => {
 progress.style.width = '100%';
