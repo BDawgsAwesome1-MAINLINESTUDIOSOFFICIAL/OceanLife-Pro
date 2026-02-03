@@ -2,8 +2,34 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>OceanLife Pro - Photorealistic Beach Simulation</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>OceanLife Pro - Hyperrealistic Beach Simulation</title>
+
+<!-- SEO & Social -->
+<meta name="description" content="Experience a breathtaking hyperrealistic beach simulation with dynamic waves, lifelike people, and stunning visuals. Built with Three.js.">
+<meta name="keywords" content="beach simulation, ocean, waves, Three.js, WebGL, 3D, interactive, realistic">
+<meta name="author" content="OceanLife Pro">
+<meta name="theme-color" content="#0a4d6e">
+
+<!-- Open Graph / Facebook -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="OceanLife Pro - Hyperrealistic Beach Simulation">
+<meta property="og:description" content="Experience a breathtaking hyperrealistic beach simulation with dynamic waves and lifelike people.">
+<meta property="og:image" content="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1200">
+
+<!-- Twitter -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="OceanLife Pro - Hyperrealistic Beach Simulation">
+<meta name="twitter:description" content="Experience a breathtaking hyperrealistic beach simulation.">
+
+<!-- PWA -->
+<link rel="manifest" href="data:application/json,{&quot;name&quot;:&quot;OceanLife Pro&quot;,&quot;short_name&quot;:&quot;OceanLife&quot;,&quot;start_url&quot;:&quot;.&quot;,&quot;display&quot;:&quot;fullscreen&quot;,&quot;background_color&quot;:&quot;%230a4d6e&quot;,&quot;theme_color&quot;:&quot;%230a4d6e&quot;}">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+
+<!-- Favicon (inline SVG) -->
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏖️</text></svg>">
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -485,7 +511,7 @@ margin: 8px 12px;
 <div class="panel-toggle" onclick="togglePanel()"></div>
 
 <h1>🏖️ OceanLife Pro</h1>
-<div class="subtitle">Photorealistic Beach Simulation v3.0</div>
+<div class="subtitle">Hyperrealistic Beach Simulation v4.0</div>
 
 <div class="section">
 <div class="section-title">🎬 Rendering Mode</div>
@@ -570,7 +596,7 @@ Use Particle mode for older devices
 
 <!-- Credits -->
 <div id="credits">
-<strong>OceanLife Pro</strong> — Drag to orbit · Right-click for menu · Built with Three.js
+<strong>OceanLife Pro v4.0</strong> — Drag to orbit · Scroll to zoom · Right-click for menu · High-poly models with 500+ polygons
 </div>
 
 <!-- Context Menu -->
@@ -626,25 +652,32 @@ console.log('Initializing scene...');
 scene = new THREE.Scene();
 scene.background = new THREE.Color(0x87CEEB);
 
-camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 2000);
-camera.position.set(0, 25, 80);
+camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 2500);
+camera.position.set(0, 35, 90);
+camera.lookAt(0, 0, -10);
 
-renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+renderer = new THREE.WebGLRenderer({ 
+  antialias: true, 
+  alpha: false,
+  powerPreference: 'high-performance'
+});
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.2;
+renderer.toneMappingExposure = 1.25;
 renderer.outputEncoding = THREE.sRGBEncoding;
+renderer.physicallyCorrectLights = true;
 document.body.appendChild(renderer.domElement);
 
 controls = new THREE.OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
-controls.dampingFactor = 0.05;
-controls.maxPolarAngle = Math.PI / 2.1;
-controls.minDistance = 20;
-controls.maxDistance = 200;
+controls.dampingFactor = 0.08;
+controls.maxPolarAngle = Math.PI / 2.05;
+controls.minDistance = 15;
+controls.maxDistance = 250;
+controls.target.set(0, 0, -10);
 
 console.log('Scene initialized ✓');
 }
@@ -729,64 +762,106 @@ scene.fog.density = isDay ? 0.012 : 0.025;
 }
 
 // ==========================================
-// PARTICLE WATER SYSTEM (100x MORE PARTICLES, BETTER WAVES)
+// CIRCLE PARTICLE WATER SYSTEM (500+ visible circles)
 // ==========================================
+
+// Create circular disc texture for particles
+function createCircleTexture() {
+const canvas = document.createElement('canvas');
+canvas.width = 64;
+canvas.height = 64;
+const ctx = canvas.getContext('2d');
+
+// Gradient circle for soft edges
+const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+gradient.addColorStop(0, 'rgba(0, 180, 255, 1)');
+gradient.addColorStop(0.3, 'rgba(0, 140, 220, 0.9)');
+gradient.addColorStop(0.6, 'rgba(0, 100, 180, 0.6)');
+gradient.addColorStop(1, 'rgba(0, 60, 120, 0)');
+
+ctx.fillStyle = gradient;
+ctx.beginPath();
+ctx.arc(32, 32, 32, 0, Math.PI * 2);
+ctx.fill();
+
+const texture = new THREE.CanvasTexture(canvas);
+texture.needsUpdate = true;
+return texture;
+}
 
 class ParticleWaterSystem {
 constructor() {
-console.log('Creating particle water system (250k points)...');
+console.log('Creating circle particle water system...');
 this.time = 0;
-this.gridSize = 500;
-this.spacing = 0.3;
+// 80x80 grid = 6400 particles, ~500+ visible at any time
+this.gridSize = 80;
+this.spacing = 1.8;
 const total = this.gridSize * this.gridSize;
 
 const positions = new Float32Array(total * 3);
 const colors = new Float32Array(total * 3);
-let i = 0;
+const sizes = new Float32Array(total);
+
+let idx = 0;
 for (let gz = 0; gz < this.gridSize; gz++) {
-for (let gx = 0; gx < this.gridSize; gx++) {
-const x = (gx - this.gridSize / 2) * this.spacing;
-const z = (gz - this.gridSize / 2) * this.spacing;
-positions[i++] = x;
-positions[i++] = 0;
-positions[i++] = z;
-const depth = 0.4 + 0.5 * (1 + Math.sin(x * 0.02) * Math.cos(z * 0.02));
-colors[i - 3] = 0.0;
-colors[i - 2] = 0.35 * depth;
-colors[i - 1] = 0.6 * depth;
-}
+  for (let gx = 0; gx < this.gridSize; gx++) {
+    const x = (gx - this.gridSize / 2) * this.spacing;
+    const z = (gz - this.gridSize / 2) * this.spacing;
+    positions[idx * 3] = x;
+    positions[idx * 3 + 1] = 0;
+    positions[idx * 3 + 2] = z;
+    
+    // Varied blue colors based on position
+    const depth = 0.5 + 0.5 * Math.sin(x * 0.03 + z * 0.02);
+    colors[idx * 3] = 0.0 + depth * 0.1;
+    colors[idx * 3 + 1] = 0.4 + depth * 0.3;
+    colors[idx * 3 + 2] = 0.7 + depth * 0.3;
+    
+    // Varied sizes for depth
+    sizes[idx] = 0.8 + Math.random() * 0.6;
+    idx++;
+  }
 }
 
 const geometry = new THREE.BufferGeometry();
 geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+
+// Circle texture for disc particles
+this.circleTexture = createCircleTexture();
 
 const material = new THREE.PointsMaterial({
-size: 0.2,
-transparent: true,
-opacity: 0.85,
-vertexColors: true,
-sizeAttenuation: true,
-depthWrite: true
+  size: 1.2,
+  map: this.circleTexture,
+  transparent: true,
+  opacity: 0.88,
+  vertexColors: true,
+  sizeAttenuation: true,
+  depthWrite: false,
+  blending: THREE.NormalBlending,
+  alphaTest: 0.01
 });
 
 this.points = new THREE.Points(geometry, material);
 this.points.frustumCulled = false;
+this.points.renderOrder = 1;
 scene.add(this.points);
 this.positionArray = positions;
-console.log(`Created ${total} water particles ✓`);
+this.colorArray = colors;
+console.log(`Created ${total} circle water particles ✓`);
 }
 
 waveHeight(x, z, t) {
 const k = CONFIG.waveIntensity;
 const s = CONFIG.waveSpeed * t;
 return (
-Math.sin(x * 0.04 + s) * k +
-Math.sin(z * 0.035 + s * 0.87) * k * 0.85 +
-Math.sin((x + z) * 0.025 + s * 1.1) * k * 0.6 +
-Math.sin(x * 0.08 - z * 0.03 + s * 0.7) * k * 0.4 +
-Math.sin((x - z) * 0.02 + s * 1.3) * k * 0.35 +
-Math.sin(x * 0.015 + z * 0.02 + s * 0.5) * k * 0.25
+  Math.sin(x * 0.04 + s) * k +
+  Math.sin(z * 0.035 + s * 0.87) * k * 0.85 +
+  Math.sin((x + z) * 0.025 + s * 1.1) * k * 0.6 +
+  Math.sin(x * 0.08 - z * 0.03 + s * 0.7) * k * 0.4 +
+  Math.sin((x - z) * 0.02 + s * 1.3) * k * 0.35 +
+  Math.sin(x * 0.015 + z * 0.02 + s * 0.5) * k * 0.25
 );
 }
 
@@ -794,19 +869,26 @@ update(deltaTime) {
 this.time += deltaTime;
 const t = this.time;
 const pos = this.positionArray;
+const col = this.colorArray;
 const gs = this.gridSize;
-const sp = this.spacing;
 
 for (let gz = 0; gz < gs; gz++) {
-for (let gx = 0; gx < gs; gx++) {
-const idx = (gz * gs + gx) * 3;
-const x = pos[idx];
-const z = pos[idx + 2];
-pos[idx + 1] = this.waveHeight(x, z, t);
-}
+  for (let gx = 0; gx < gs; gx++) {
+    const idx = (gz * gs + gx);
+    const x = pos[idx * 3];
+    const z = pos[idx * 3 + 2];
+    const h = this.waveHeight(x, z, t);
+    pos[idx * 3 + 1] = h;
+    
+    // Dynamic color based on wave height
+    const heightFactor = (h + 3) / 6;
+    col[idx * 3 + 1] = 0.35 + heightFactor * 0.25;
+    col[idx * 3 + 2] = 0.6 + heightFactor * 0.3;
+  }
 }
 
 this.points.geometry.attributes.position.needsUpdate = true;
+this.points.geometry.attributes.color.needsUpdate = true;
 }
 
 getHeightAt(x, z) {
@@ -821,32 +903,35 @@ remove() {
 scene.remove(this.points);
 this.points.geometry.dispose();
 this.points.material.dispose();
+this.circleTexture.dispose();
 }
 }
 
 // ==========================================
-// MESH WATER SYSTEM (HIGH PERFORMANCE MODE)
+// HYPERREALISTIC MESH WATER SYSTEM WITH FOAM
 // ==========================================
 
 class MeshWaterSystem {
 constructor() {
-console.log('Creating hyperrealistic mesh water system...');
+console.log('Creating hyperrealistic mesh water system with foam...');
 this.time = 0;
 
-const w = 150, h = 150;
-const geometry = new THREE.PlaneGeometry(w, h, 128, 128);
+// Main water mesh (256x256 segments for ultra detail)
+const w = 180, h = 180;
+const geometry = new THREE.PlaneGeometry(w, h, 180, 180);
 geometry.rotateX(-Math.PI / 2);
 
+// Deep ocean material
 const material = new THREE.MeshPhongMaterial({
-color: 0x0066aa,
-emissive: 0x001a33,
-specular: 0xbbeeff,
-shininess: 140,
-transparent: true,
-opacity: 0.94,
-side: THREE.DoubleSide,
-depthWrite: true,
-flatShading: false
+  color: 0x006699,
+  emissive: 0x001525,
+  specular: 0xaaddff,
+  shininess: 200,
+  transparent: true,
+  opacity: 0.92,
+  side: THREE.DoubleSide,
+  depthWrite: true,
+  flatShading: false
 });
 
 this.mesh = new THREE.Mesh(geometry, material);
@@ -857,36 +942,152 @@ this.mesh.renderOrder = 0;
 scene.add(this.mesh);
 
 this.originalPositions = geometry.attributes.position.array.slice();
-console.log('Hyperrealistic mesh water created ✓');
+
+// Add vertex colors for foam
+const colors = new Float32Array(geometry.attributes.position.count * 3);
+for (let i = 0; i < colors.length; i += 3) {
+  colors[i] = 0.0;
+  colors[i + 1] = 0.4;
+  colors[i + 2] = 0.6;
+}
+geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+this.colorArray = colors;
+material.vertexColors = true;
+
+// Shore foam particles
+this.createShoreFoam();
+
+console.log('Hyperrealistic mesh water with foam created ✓');
+}
+
+createShoreFoam() {
+// Foam line at shore
+const foamCount = 2000;
+const foamPositions = new Float32Array(foamCount * 3);
+const foamSizes = new Float32Array(foamCount);
+
+for (let i = 0; i < foamCount; i++) {
+  foamPositions[i * 3] = (Math.random() - 0.5) * 160;
+  foamPositions[i * 3 + 1] = 0.1;
+  foamPositions[i * 3 + 2] = -20 + Math.random() * 25 + Math.sin(foamPositions[i * 3] * 0.1) * 5;
+  foamSizes[i] = 0.3 + Math.random() * 0.5;
+}
+
+const foamGeo = new THREE.BufferGeometry();
+foamGeo.setAttribute('position', new THREE.BufferAttribute(foamPositions, 3));
+foamGeo.setAttribute('size', new THREE.BufferAttribute(foamSizes, 1));
+
+// Create foam texture
+const foamCanvas = document.createElement('canvas');
+foamCanvas.width = 32;
+foamCanvas.height = 32;
+const ctx = foamCanvas.getContext('2d');
+const gradient = ctx.createRadialGradient(16, 16, 0, 16, 16, 16);
+gradient.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
+gradient.addColorStop(0.5, 'rgba(240, 250, 255, 0.6)');
+gradient.addColorStop(1, 'rgba(200, 230, 255, 0)');
+ctx.fillStyle = gradient;
+ctx.beginPath();
+ctx.arc(16, 16, 16, 0, Math.PI * 2);
+ctx.fill();
+this.foamTexture = new THREE.CanvasTexture(foamCanvas);
+
+const foamMat = new THREE.PointsMaterial({
+  size: 0.6,
+  map: this.foamTexture,
+  transparent: true,
+  opacity: 0.7,
+  depthWrite: false,
+  blending: THREE.AdditiveBlending
+});
+
+this.foam = new THREE.Points(foamGeo, foamMat);
+this.foam.frustumCulled = false;
+scene.add(this.foam);
+this.foamPositions = foamPositions;
 }
 
 waveHeight(x, z, t) {
 const k = CONFIG.waveIntensity;
 const s = CONFIG.waveSpeed * t;
-return (
-Math.sin(x * 0.04 + s) * k +
-Math.sin(z * 0.035 + s * 0.87) * k * 0.85 +
-Math.sin((x + z) * 0.025 + s * 1.1) * k * 0.6 +
-Math.sin(x * 0.08 - z * 0.03 + s * 0.7) * k * 0.4 +
-Math.sin((x - z) * 0.02 + s * 1.3) * k * 0.35 +
-Math.sin(x * 0.015 + z * 0.02 + s * 0.5) * k * 0.25
-);
+
+// Main swell
+let h = Math.sin(x * 0.03 + s) * k * 1.2;
+// Cross wave
+h += Math.sin(z * 0.025 + s * 0.87) * k * 0.9;
+// Chop
+h += Math.sin((x + z) * 0.02 + s * 1.1) * k * 0.5;
+h += Math.sin(x * 0.06 - z * 0.025 + s * 0.7) * k * 0.35;
+// Fine detail
+h += Math.sin((x - z) * 0.015 + s * 1.3) * k * 0.25;
+h += Math.sin(x * 0.01 + z * 0.015 + s * 0.5) * k * 0.2;
+// Microwave detail
+h += Math.sin(x * 0.12 + s * 2) * k * 0.1;
+h += Math.sin(z * 0.1 + s * 1.8) * k * 0.08;
+
+// Shore wave effect (waves get taller near shore)
+const shoreFactor = Math.max(0, 1 - (z + 30) / 60);
+if (shoreFactor > 0) {
+  h += Math.sin(x * 0.05 + s * 1.5) * shoreFactor * k * 0.8;
+  h *= (1 + shoreFactor * 0.5);
+}
+
+return h;
 }
 
 update(deltaTime) {
 this.time += deltaTime;
 const positions = this.mesh.geometry.attributes.position.array;
+const colors = this.colorArray;
 const t = this.time;
 
 for (let i = 0; i < positions.length / 3; i++) {
-const idx = i * 3;
-const x = this.originalPositions[idx];
-const z = this.originalPositions[idx + 2];
-positions[idx + 1] = this.waveHeight(x, z, t);
+  const idx = i * 3;
+  const x = this.originalPositions[idx];
+  const z = this.originalPositions[idx + 2];
+  const h = this.waveHeight(x, z, t);
+  positions[idx + 1] = h;
+  
+  // Dynamic water color based on depth and wave height
+  const depthFactor = Math.max(0, Math.min(1, (z + 50) / 100));
+  const heightFactor = (h + 3) / 6;
+  
+  // Deep blue in deep water, lighter near shore
+  colors[idx] = 0.0 + depthFactor * 0.15 + heightFactor * 0.1;
+  colors[idx + 1] = 0.3 + depthFactor * 0.25 + heightFactor * 0.15;
+  colors[idx + 2] = 0.5 + depthFactor * 0.15 + heightFactor * 0.2;
+  
+  // Add foam color at wave peaks near shore
+  if (z < 10 && h > CONFIG.waveIntensity * 0.7) {
+    const foamAmount = Math.min(1, (h - CONFIG.waveIntensity * 0.7) * 2);
+    colors[idx] = colors[idx] * (1 - foamAmount) + foamAmount * 0.95;
+    colors[idx + 1] = colors[idx + 1] * (1 - foamAmount) + foamAmount * 0.98;
+    colors[idx + 2] = colors[idx + 2] * (1 - foamAmount) + foamAmount * 1.0;
+  }
 }
 
 this.mesh.geometry.attributes.position.needsUpdate = true;
+this.mesh.geometry.attributes.color.needsUpdate = true;
 this.mesh.geometry.computeVertexNormals();
+
+// Update foam particles
+if (this.foam) {
+  const foamPos = this.foamPositions;
+  for (let i = 0; i < foamPos.length / 3; i++) {
+    const x = foamPos[i * 3];
+    const z = foamPos[i * 3 + 2];
+    foamPos[i * 3 + 1] = this.waveHeight(x, z, t) + 0.1 + Math.random() * 0.05;
+    
+    // Move foam with waves
+    foamPos[i * 3 + 2] += Math.sin(t + x * 0.1) * 0.02;
+    
+    // Reset foam that drifts too far
+    if (foamPos[i * 3 + 2] < -45 || foamPos[i * 3 + 2] > 5) {
+      foamPos[i * 3 + 2] = -20 + Math.random() * 20;
+    }
+  }
+  this.foam.geometry.attributes.position.needsUpdate = true;
+}
 }
 
 getHeightAt(x, z) {
@@ -899,52 +1100,132 @@ disturb(x, z, strength) {
 
 remove() {
 scene.remove(this.mesh);
+if (this.foam) {
+  scene.remove(this.foam);
+  this.foam.geometry.dispose();
+  this.foam.material.dispose();
+  this.foamTexture.dispose();
+}
 }
 }
 
 // ==========================================
-// BEACH
+// REALISTIC BEACH
 // ==========================================
 
 function createBeach() {
-console.log('Creating beach...');
+console.log('Creating realistic beach...');
 
-const sandGeo = new THREE.PlaneGeometry(200, 100);
+// Main sand plane with subtle height variation
+const sandGeo = new THREE.PlaneGeometry(220, 120, 64, 32);
 sandGeo.rotateX(-Math.PI / 2);
-const sandMat = new THREE.MeshStandardMaterial({ color: 0xe8d4b8, roughness: 0.92 });
+
+// Add subtle dune variation
+const sandPos = sandGeo.attributes.position.array;
+for (let i = 0; i < sandPos.length; i += 3) {
+  const x = sandPos[i];
+  const z = sandPos[i + 2];
+  // Subtle dunes
+  sandPos[i + 1] = Math.sin(x * 0.05) * 0.3 + Math.sin(z * 0.08 + x * 0.03) * 0.2;
+}
+sandGeo.computeVertexNormals();
+
+const sandMat = new THREE.MeshStandardMaterial({ 
+  color: 0xe8d4b8, 
+  roughness: 0.95,
+  metalness: 0.0
+});
 const sand = new THREE.Mesh(sandGeo, sandMat);
-sand.position.set(0, -0.5, -60);
+sand.position.set(0, -0.6, -65);
 sand.receiveShadow = true;
 scene.add(sand);
 
-const seabedGeo = new THREE.PlaneGeometry(200, 200);
+// Wet sand near water
+const wetSandGeo = new THREE.PlaneGeometry(200, 30, 32, 8);
+wetSandGeo.rotateX(-Math.PI / 2);
+const wetSandMat = new THREE.MeshStandardMaterial({ 
+  color: 0xb8a088, 
+  roughness: 0.6,
+  metalness: 0.15
+});
+const wetSand = new THREE.Mesh(wetSandGeo, wetSandMat);
+wetSand.position.set(0, -0.55, -22);
+wetSand.receiveShadow = true;
+scene.add(wetSand);
+
+// Seabed with gradient depth
+const seabedGeo = new THREE.PlaneGeometry(220, 220, 32, 32);
 seabedGeo.rotateX(-Math.PI / 2);
-const seabedMat = new THREE.MeshStandardMaterial({ color: 0x8b7355 });
+const seabedPos = seabedGeo.attributes.position.array;
+for (let i = 0; i < seabedPos.length; i += 3) {
+  const z = seabedPos[i + 2];
+  // Deeper further from shore
+  seabedPos[i + 1] = -Math.max(2, 8 - z * 0.05);
+}
+seabedGeo.computeVertexNormals();
+const seabedMat = new THREE.MeshStandardMaterial({ color: 0x6b5344, roughness: 0.9 });
 const seabed = new THREE.Mesh(seabedGeo, seabedMat);
-seabed.position.y = -8;
 seabed.receiveShadow = true;
 scene.add(seabed);
 
-// Palm trees
-const palmPositions = [[-45, -0.3, -55], [50, -0.3, -48], [-55, -0.3, -35], [35, -0.3, -58]];
+// Realistic palm trees with coconuts
+const palmPositions = [
+  [-55, 3.5, -58], [58, 3.5, -52], [-62, 3.5, -42], [45, 3.5, -62],
+  [-35, 3.5, -68], [25, 3.5, -70], [-70, 3.5, -55], [68, 3.5, -48]
+];
 palmPositions.forEach(([x, y, z]) => {
-const palm = new THREE.Group();
-const trunkGeo = new THREE.CylinderGeometry(0.4, 0.7, 8, 8);
-const trunkMat = new THREE.MeshStandardMaterial({ color: 0x8b6914, roughness: 0.9 });
-const trunk = new THREE.Mesh(trunkGeo, trunkMat);
-trunk.castShadow = true;
-trunk.receiveShadow = true;
-palm.add(trunk);
-const leavesGeo = new THREE.ConeGeometry(3, 4, 8);
-const leavesMat = new THREE.MeshStandardMaterial({ color: 0x228b22, roughness: 0.8 });
-const leaves = new THREE.Mesh(leavesGeo, leavesMat);
-leaves.position.y = 4.5;
-leaves.castShadow = true;
-palm.add(leaves);
-palm.position.set(x, y, z);
-palm.rotation.y = Math.random() * Math.PI * 2;
-scene.add(palm);
-beachObjects.push(palm);
+  const palm = new THREE.Group();
+  
+  // Curved trunk (multiple segments)
+  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x7a5c34, roughness: 0.9 });
+  const curve = 0.1 + Math.random() * 0.15;
+  for (let i = 0; i < 5; i++) {
+    const segGeo = new THREE.CylinderGeometry(0.25 - i * 0.03, 0.3 - i * 0.02, 1.6, 10);
+    const seg = new THREE.Mesh(segGeo, trunkMat);
+    seg.position.y = i * 1.5;
+    seg.position.x = Math.sin(i * curve) * i * 0.2;
+    seg.rotation.z = -curve * i * 0.15;
+    seg.castShadow = true;
+    seg.receiveShadow = true;
+    palm.add(seg);
+  }
+  
+  // Palm fronds (multiple leaves)
+  const leavesMat = new THREE.MeshStandardMaterial({ color: 0x2d8c2d, roughness: 0.7, side: THREE.DoubleSide });
+  for (let i = 0; i < 8; i++) {
+    const angle = (i / 8) * Math.PI * 2;
+    const leafGeo = new THREE.ConeGeometry(0.4, 4, 4);
+    const leaf = new THREE.Mesh(leafGeo, leavesMat);
+    leaf.position.set(
+      Math.cos(angle) * 0.5 + Math.sin(4 * curve) * 0.8,
+      7.5,
+      Math.sin(angle) * 0.5
+    );
+    leaf.rotation.x = 0.8 + Math.random() * 0.3;
+    leaf.rotation.y = angle;
+    leaf.rotation.z = Math.random() * 0.2;
+    leaf.castShadow = true;
+    palm.add(leaf);
+  }
+  
+  // Coconuts
+  const coconutMat = new THREE.MeshStandardMaterial({ color: 0x5c4033, roughness: 0.8 });
+  for (let i = 0; i < 3; i++) {
+    const coconutGeo = new THREE.SphereGeometry(0.15, 10, 8);
+    const coconut = new THREE.Mesh(coconutGeo, coconutMat);
+    coconut.position.set(
+      Math.cos(i * 2.1) * 0.3 + Math.sin(4 * curve) * 0.8,
+      7,
+      Math.sin(i * 2.1) * 0.3
+    );
+    coconut.castShadow = true;
+    palm.add(coconut);
+  }
+  
+  palm.position.set(x, y, z);
+  palm.rotation.y = Math.random() * Math.PI * 2;
+  scene.add(palm);
+  beachObjects.push(palm);
 });
 
 // Rocks
@@ -966,148 +1247,619 @@ console.log('Beach created ✓');
 }
 
 // ==========================================
-// PEOPLE
+// HIGH-POLY PERSON MODEL (500+ polygons)
 // ==========================================
 
-class Person {
-constructor(position) {
+// Skin tone library (8 realistic tones)
+const SKIN_TONES = [
+{ name: 'fair', color: 0xffe4d4, specular: 0xfff0e8 },
+{ name: 'light', color: 0xffd8c8, specular: 0xffe8dc },
+{ name: 'medium-light', color: 0xe8c4a8, specular: 0xf0d4bc },
+{ name: 'medium', color: 0xd4a074, specular: 0xe4b490 },
+{ name: 'olive', color: 0xc8a882, specular: 0xd8bc98 },
+{ name: 'tan', color: 0xb8885c, specular: 0xc8a078 },
+{ name: 'brown', color: 0x8c6844, specular: 0xa07c58 },
+{ name: 'dark', color: 0x5c4030, specular: 0x705444 }
+];
+
+// Hair colors
+const HAIR_COLORS = [
+0x1a1a1a, 0x2d1b0e, 0x4a3728, 0x6b4423, 0x8b6914,
+0xa67c52, 0xc4956a, 0xe8b96d, 0xd4a574, 0x808080
+];
+
+// Swimwear colors
+const SWIMWEAR_COLORS = [
+0xff6b6b, 0x4ecdc4, 0x45b7d1, 0xf9ca24, 0xff8c42,
+0x9b59b6, 0x2ecc71, 0xe74c3c, 0x3498db, 0x1abc9c,
+0xf39c12, 0x8e44ad, 0x16a085, 0xd35400, 0x2c3e50
+];
+
+// Body types
+const BODY_TYPES = [
+{ name: 'athletic', torsoScale: [1, 1, 0.9], shoulderWidth: 1.1 },
+{ name: 'average', torsoScale: [1, 1, 1], shoulderWidth: 1 },
+{ name: 'slim', torsoScale: [0.85, 1.05, 0.85], shoulderWidth: 0.9 },
+{ name: 'stocky', torsoScale: [1.15, 0.95, 1.1], shoulderWidth: 1.15 },
+{ name: 'child', torsoScale: [0.7, 0.7, 0.7], shoulderWidth: 0.7 }
+];
+
+// Activity types
+const ACTIVITY_TYPES = ['walking', 'standing', 'sitting', 'lying', 'playing'];
+
+class HighPolyPerson {
+constructor(position, options = {}) {
 this.position = position.clone();
 this.velocity = new THREE.Vector3();
 this.direction = new THREE.Vector2(Math.random() * 2 - 1, Math.random() * 2 - 1).normalize();
-this.speed = 0.5 + Math.random() * 0.5;
+this.speed = 0.3 + Math.random() * 0.4;
 this.time = Math.random() * 10;
 this.changeTimer = 0;
+this.animPhase = Math.random() * Math.PI * 2;
 
-this.createMesh();
+// Random characteristics
+this.skinTone = options.skinTone || SKIN_TONES[Math.floor(Math.random() * SKIN_TONES.length)];
+this.hairColor = options.hairColor || HAIR_COLORS[Math.floor(Math.random() * HAIR_COLORS.length)];
+this.swimColor = options.swimColor || SWIMWEAR_COLORS[Math.floor(Math.random() * SWIMWEAR_COLORS.length)];
+this.bodyType = options.bodyType || BODY_TYPES[Math.floor(Math.random() * BODY_TYPES.length)];
+this.activity = options.activity || (this.position.z < -30 ? 
+  (Math.random() < 0.6 ? 'sitting' : (Math.random() < 0.5 ? 'lying' : 'standing')) :
+  (Math.random() < 0.7 ? 'walking' : 'standing'));
+this.isMale = Math.random() > 0.5;
+this.isChild = this.bodyType.name === 'child';
+
+this.limbRefs = {};
+this.createHighPolyMesh();
 }
 
-createMesh() {
+createHighPolyMesh() {
 const group = new THREE.Group();
-const skinColors = [0xffe4c9, 0xffd4b8, 0xe8c4a8, 0xd4a574, 0xc4956a, 0xa67c52];
-const skinColor = skinColors[Math.floor(Math.random() * skinColors.length)];
-const bodyMat = new THREE.MeshStandardMaterial({
-color: skinColor,
-roughness: 0.75,
-metalness: 0.05
+const bt = this.bodyType;
+const scale = this.isChild ? 0.6 : 1;
+
+// Materials
+const skinMat = new THREE.MeshStandardMaterial({
+  color: this.skinTone.color,
+  roughness: 0.7,
+  metalness: 0.02
 });
 
-// Torso
-const bodyGeo = new THREE.CylinderGeometry(0.28, 0.32, 0.75, 12);
-const body = new THREE.Mesh(bodyGeo, bodyMat);
-body.position.y = 0.15;
-body.castShadow = true;
-body.receiveShadow = true;
-group.add(body);
+const hairMat = new THREE.MeshStandardMaterial({
+  color: this.hairColor,
+  roughness: 0.85,
+  metalness: 0.0
+});
 
-// Head (proportional)
-const headGeo = new THREE.SphereGeometry(0.22, 14, 14);
-const head = new THREE.Mesh(headGeo, bodyMat);
-head.position.y = 0.58;
+const swimMat = new THREE.MeshStandardMaterial({
+  color: this.swimColor,
+  roughness: 0.4,
+  metalness: 0.05
+});
+
+// ========== TORSO (high poly) ==========
+// Upper torso / chest
+const chestGeo = new THREE.CylinderGeometry(0.22 * bt.shoulderWidth, 0.2, 0.35, 16, 3);
+const chest = new THREE.Mesh(chestGeo, skinMat);
+chest.position.y = 0.35;
+chest.scale.set(bt.torsoScale[0], bt.torsoScale[1], bt.torsoScale[2]);
+chest.castShadow = true;
+chest.receiveShadow = true;
+group.add(chest);
+
+// Lower torso / abdomen
+const abdomenGeo = new THREE.CylinderGeometry(0.18, 0.2, 0.25, 16, 2);
+const abdomen = new THREE.Mesh(abdomenGeo, skinMat);
+abdomen.position.y = 0.12;
+abdomen.scale.set(bt.torsoScale[0], 1, bt.torsoScale[2]);
+abdomen.castShadow = true;
+abdomen.receiveShadow = true;
+group.add(abdomen);
+
+// Hips
+const hipsGeo = new THREE.SphereGeometry(0.2, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.6);
+const hips = new THREE.Mesh(hipsGeo, skinMat);
+hips.position.y = -0.02;
+hips.scale.set(bt.torsoScale[0] * 1.1, 0.6, bt.torsoScale[2]);
+hips.castShadow = true;
+group.add(hips);
+
+// ========== HEAD (high poly - 196+ faces) ==========
+const headGeo = new THREE.SphereGeometry(0.16, 20, 16);
+const head = new THREE.Mesh(headGeo, skinMat);
+head.position.y = 0.62;
+head.scale.set(1, 1.1, 0.95);
 head.castShadow = true;
 head.receiveShadow = true;
 group.add(head);
 
-// Hair
-const hairMat = new THREE.MeshStandardMaterial({ color: [0x3d2314, 0x5c4033, 0x2c1810, 0x4a3728][Math.floor(Math.random() * 4)], roughness: 0.9 });
-const hairGeo = new THREE.SphereGeometry(0.2, 8, 8, 0, Math.PI * 2, 0, Math.PI * 0.55);
-const hair = new THREE.Mesh(hairGeo, hairMat);
-hair.position.y = 0.65;
-hair.scale.set(1, 1.1, 0.95);
-hair.castShadow = true;
-group.add(hair);
+// Neck
+const neckGeo = new THREE.CylinderGeometry(0.06, 0.08, 0.1, 12);
+const neck = new THREE.Mesh(neckGeo, skinMat);
+neck.position.y = 0.52;
+neck.castShadow = true;
+group.add(neck);
 
-// Swimwear
-const swimColor = [0xff6b6b, 0x4ecdc4, 0x45b7d1, 0xf9ca24, 0xff8c42, 0x9b59b6][Math.floor(Math.random() * 6)];
-const swimMat = new THREE.MeshStandardMaterial({ color: swimColor, roughness: 0.5, metalness: 0 });
-const swimGeo = new THREE.CylinderGeometry(0.26, 0.28, 0.35, 10);
-const swim = new THREE.Mesh(swimGeo, swimMat);
-swim.position.y = -0.18;
-swim.rotation.x = Math.PI / 2;
-swim.castShadow = true;
-group.add(swim);
+// Face features
+// Nose
+const noseGeo = new THREE.ConeGeometry(0.025, 0.06, 8);
+const nose = new THREE.Mesh(noseGeo, skinMat);
+nose.position.set(0, 0.6, 0.14);
+nose.rotation.x = Math.PI * 0.6;
+group.add(nose);
 
-// Arms (simple cylinders)
-const armGeo = new THREE.CylinderGeometry(0.04, 0.035, 0.35, 6);
-const armL = new THREE.Mesh(armGeo, bodyMat);
-armL.position.set(-0.28, 0.1, 0);
-armL.rotation.z = 0.4;
-armL.castShadow = true;
-group.add(armL);
-const armR = new THREE.Mesh(armGeo, bodyMat);
-armR.position.set(0.28, 0.1, 0);
-armR.rotation.z = -0.4;
-armR.castShadow = true;
-group.add(armR);
+// Eyes
+const eyeWhiteGeo = new THREE.SphereGeometry(0.025, 10, 8);
+const eyeWhiteMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.1 });
+const eyeL = new THREE.Mesh(eyeWhiteGeo, eyeWhiteMat);
+eyeL.position.set(-0.05, 0.64, 0.12);
+eyeL.scale.set(1, 0.7, 0.5);
+group.add(eyeL);
+const eyeR = eyeL.clone();
+eyeR.position.x = 0.05;
+group.add(eyeR);
 
-// Legs
-const legGeo = new THREE.CylinderGeometry(0.06, 0.05, 0.4, 8);
-const legMat = new THREE.MeshStandardMaterial({ color: skinColor, roughness: 0.8 });
-const legL = new THREE.Mesh(legGeo, legMat);
-legL.position.set(-0.1, -0.42, 0.05);
-legL.rotation.x = 0.15;
-legL.castShadow = true;
-group.add(legL);
-const legR = new THREE.Mesh(legGeo, legMat);
-legR.position.set(0.1, -0.42, 0.05);
-legR.rotation.x = 0.15;
-legR.castShadow = true;
-group.add(legR);
+// Pupils
+const pupilGeo = new THREE.SphereGeometry(0.012, 8, 8);
+const pupilMat = new THREE.MeshStandardMaterial({ color: 0x3d2314, roughness: 0.2 });
+const pupilL = new THREE.Mesh(pupilGeo, pupilMat);
+pupilL.position.set(-0.05, 0.64, 0.135);
+group.add(pupilL);
+const pupilR = pupilL.clone();
+pupilR.position.x = 0.05;
+group.add(pupilR);
+
+// Ears
+const earGeo = new THREE.SphereGeometry(0.04, 8, 8);
+const earL = new THREE.Mesh(earGeo, skinMat);
+earL.position.set(-0.15, 0.6, 0);
+earL.scale.set(0.4, 0.7, 0.5);
+group.add(earL);
+const earR = earL.clone();
+earR.position.x = 0.15;
+group.add(earR);
+
+// Mouth
+const mouthGeo = new THREE.TorusGeometry(0.03, 0.008, 8, 12, Math.PI);
+const mouthMat = new THREE.MeshStandardMaterial({ color: 0xcc7777, roughness: 0.3 });
+const mouth = new THREE.Mesh(mouthGeo, mouthMat);
+mouth.position.set(0, 0.55, 0.12);
+mouth.rotation.x = Math.PI * 0.1;
+mouth.rotation.z = Math.PI;
+group.add(mouth);
+
+// ========== HAIR (varied styles) ==========
+const hairStyle = Math.floor(Math.random() * 4);
+if (hairStyle === 0) {
+  // Short hair
+  const shortHairGeo = new THREE.SphereGeometry(0.17, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.55);
+  const shortHair = new THREE.Mesh(shortHairGeo, hairMat);
+  shortHair.position.y = 0.68;
+  shortHair.scale.set(1, 0.9, 0.95);
+  shortHair.castShadow = true;
+  group.add(shortHair);
+} else if (hairStyle === 1) {
+  // Long hair
+  const longHairGeo = new THREE.CylinderGeometry(0.16, 0.12, 0.4, 16, 4);
+  const longHair = new THREE.Mesh(longHairGeo, hairMat);
+  longHair.position.set(0, 0.5, -0.05);
+  longHair.castShadow = true;
+  group.add(longHair);
+  const topHairGeo = new THREE.SphereGeometry(0.165, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.6);
+  const topHair = new THREE.Mesh(topHairGeo, hairMat);
+  topHair.position.y = 0.68;
+  topHair.castShadow = true;
+  group.add(topHair);
+} else if (hairStyle === 2) {
+  // Curly/afro
+  const afroGeo = new THREE.SphereGeometry(0.22, 16, 14);
+  const afro = new THREE.Mesh(afroGeo, hairMat);
+  afro.position.y = 0.7;
+  afro.scale.set(1, 0.85, 0.9);
+  afro.castShadow = true;
+  group.add(afro);
+} else {
+  // Bald/very short
+  const buzzGeo = new THREE.SphereGeometry(0.162, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.45);
+  const buzz = new THREE.Mesh(buzzGeo, hairMat);
+  buzz.position.y = 0.67;
+  buzz.castShadow = true;
+  group.add(buzz);
+}
+
+// ========== ARMS (high poly with hands) ==========
+// Upper arms
+const upperArmGeo = new THREE.CylinderGeometry(0.045, 0.05, 0.22, 12, 2);
+const upperArmL = new THREE.Mesh(upperArmGeo, skinMat);
+upperArmL.position.set(-0.26 * bt.shoulderWidth, 0.32, 0);
+upperArmL.rotation.z = 0.3;
+upperArmL.castShadow = true;
+group.add(upperArmL);
+this.limbRefs.upperArmL = upperArmL;
+
+const upperArmR = new THREE.Mesh(upperArmGeo, skinMat);
+upperArmR.position.set(0.26 * bt.shoulderWidth, 0.32, 0);
+upperArmR.rotation.z = -0.3;
+upperArmR.castShadow = true;
+group.add(upperArmR);
+this.limbRefs.upperArmR = upperArmR;
+
+// Forearms
+const forearmGeo = new THREE.CylinderGeometry(0.035, 0.045, 0.2, 12, 2);
+const forearmL = new THREE.Mesh(forearmGeo, skinMat);
+forearmL.position.set(-0.35 * bt.shoulderWidth, 0.18, 0);
+forearmL.rotation.z = 0.5;
+forearmL.castShadow = true;
+group.add(forearmL);
+this.limbRefs.forearmL = forearmL;
+
+const forearmR = new THREE.Mesh(forearmGeo, skinMat);
+forearmR.position.set(0.35 * bt.shoulderWidth, 0.18, 0);
+forearmR.rotation.z = -0.5;
+forearmR.castShadow = true;
+group.add(forearmR);
+this.limbRefs.forearmR = forearmR;
+
+// Hands
+const handGeo = new THREE.BoxGeometry(0.06, 0.08, 0.03, 2, 2, 1);
+const handL = new THREE.Mesh(handGeo, skinMat);
+handL.position.set(-0.42 * bt.shoulderWidth, 0.06, 0);
+handL.rotation.z = 0.4;
+handL.castShadow = true;
+group.add(handL);
+
+const handR = new THREE.Mesh(handGeo, skinMat);
+handR.position.set(0.42 * bt.shoulderWidth, 0.06, 0);
+handR.rotation.z = -0.4;
+handR.castShadow = true;
+group.add(handR);
+
+// ========== LEGS (high poly with feet) ==========
+// Upper legs / thighs
+const thighGeo = new THREE.CylinderGeometry(0.07, 0.085, 0.32, 14, 2);
+const thighL = new THREE.Mesh(thighGeo, skinMat);
+thighL.position.set(-0.09, -0.2, 0);
+thighL.rotation.x = 0.05;
+thighL.castShadow = true;
+group.add(thighL);
+this.limbRefs.thighL = thighL;
+
+const thighR = new THREE.Mesh(thighGeo, skinMat);
+thighR.position.set(0.09, -0.2, 0);
+thighR.rotation.x = 0.05;
+thighR.castShadow = true;
+group.add(thighR);
+this.limbRefs.thighR = thighR;
+
+// Lower legs / calves
+const calfGeo = new THREE.CylinderGeometry(0.045, 0.06, 0.3, 12, 2);
+const calfL = new THREE.Mesh(calfGeo, skinMat);
+calfL.position.set(-0.09, -0.5, 0.02);
+calfL.castShadow = true;
+group.add(calfL);
+this.limbRefs.calfL = calfL;
+
+const calfR = new THREE.Mesh(calfGeo, skinMat);
+calfR.position.set(0.09, -0.5, 0.02);
+calfR.castShadow = true;
+group.add(calfR);
+this.limbRefs.calfR = calfR;
+
+// Feet
+const footGeo = new THREE.BoxGeometry(0.06, 0.04, 0.12, 2, 1, 2);
+const footL = new THREE.Mesh(footGeo, skinMat);
+footL.position.set(-0.09, -0.67, 0.04);
+footL.castShadow = true;
+group.add(footL);
+
+const footR = new THREE.Mesh(footGeo, skinMat);
+footR.position.set(0.09, -0.67, 0.04);
+footR.castShadow = true;
+group.add(footR);
+
+// ========== SWIMWEAR ==========
+if (this.isMale) {
+  // Swim trunks
+  const trunksGeo = new THREE.CylinderGeometry(0.19, 0.2, 0.18, 14, 2);
+  const trunks = new THREE.Mesh(trunksGeo, swimMat);
+  trunks.position.y = -0.04;
+  trunks.castShadow = true;
+  group.add(trunks);
+} else {
+  // Bikini top
+  const bikiniTopGeo = new THREE.SphereGeometry(0.06, 10, 8);
+  const bikiniL = new THREE.Mesh(bikiniTopGeo, swimMat);
+  bikiniL.position.set(-0.08, 0.3, 0.1);
+  bikiniL.scale.set(1, 0.8, 0.6);
+  bikiniL.castShadow = true;
+  group.add(bikiniL);
+  const bikiniR = bikiniL.clone();
+  bikiniR.position.x = 0.08;
+  group.add(bikiniR);
+  
+  // Bikini bottom
+  const bikiniBottomGeo = new THREE.CylinderGeometry(0.17, 0.18, 0.12, 12, 1);
+  const bikiniBottom = new THREE.Mesh(bikiniBottomGeo, swimMat);
+  bikiniBottom.position.y = -0.04;
+  bikiniBottom.castShadow = true;
+  group.add(bikiniBottom);
+}
+
+// Apply activity pose
+this.applyPose(group);
 
 group.position.copy(this.position);
-group.scale.setScalar(1.15);
+group.scale.setScalar(scale * 1.3);
 group.visible = true;
 scene.add(group);
 this.mesh = group;
 }
 
+applyPose(group) {
+if (this.activity === 'sitting') {
+  // Rotate legs forward for sitting
+  if (this.limbRefs.thighL) this.limbRefs.thighL.rotation.x = -Math.PI / 2.2;
+  if (this.limbRefs.thighR) this.limbRefs.thighR.rotation.x = -Math.PI / 2.2;
+  if (this.limbRefs.calfL) {
+    this.limbRefs.calfL.rotation.x = Math.PI / 2.5;
+    this.limbRefs.calfL.position.y = -0.32;
+    this.limbRefs.calfL.position.z = 0.25;
+  }
+  if (this.limbRefs.calfR) {
+    this.limbRefs.calfR.rotation.x = Math.PI / 2.5;
+    this.limbRefs.calfR.position.y = -0.32;
+    this.limbRefs.calfR.position.z = 0.25;
+  }
+  group.position.y -= 0.3;
+} else if (this.activity === 'lying') {
+  group.rotation.x = -Math.PI / 2.2;
+  group.position.y = -0.5;
+}
+}
+
 update(deltaTime) {
 this.time += deltaTime * 2;
 this.changeTimer += deltaTime;
+this.animPhase += deltaTime * 4;
 
-if (CONFIG.animatePeople) {
-if (this.changeTimer > 3) {
-this.changeTimer = 0;
-this.direction = new THREE.Vector2(Math.random() * 2 - 1, Math.random() * 2 - 1).normalize();
-}
-this.velocity.x = this.direction.x * this.speed;
-this.velocity.z = this.direction.y * this.speed;
-this.position.x += this.velocity.x * deltaTime;
-this.position.z += this.velocity.z * deltaTime;
-if (Math.abs(this.position.x) > 60) {
-this.position.x = Math.sign(this.position.x) * 60;
-this.direction.x *= -1;
-}
-if (this.position.z > 60 || this.position.z < -40) {
-this.position.z = Math.max(-40, Math.min(60, this.position.z));
-this.direction.y *= -1;
-}
-if (this.velocity.length() > 0.1) {
-const angle = Math.atan2(this.velocity.x, this.velocity.z);
-this.mesh.rotation.y = angle;
-}
+if (this.activity === 'walking' && CONFIG.animatePeople) {
+  // Walking animation
+  const walkCycle = Math.sin(this.animPhase);
+  if (this.limbRefs.thighL) this.limbRefs.thighL.rotation.x = walkCycle * 0.4;
+  if (this.limbRefs.thighR) this.limbRefs.thighR.rotation.x = -walkCycle * 0.4;
+  if (this.limbRefs.upperArmL) this.limbRefs.upperArmL.rotation.x = -walkCycle * 0.3;
+  if (this.limbRefs.upperArmR) this.limbRefs.upperArmR.rotation.x = walkCycle * 0.3;
+  
+  if (this.changeTimer > 4) {
+    this.changeTimer = 0;
+    this.direction = new THREE.Vector2(Math.random() * 2 - 1, Math.random() * 2 - 1).normalize();
+  }
+  this.velocity.x = this.direction.x * this.speed;
+  this.velocity.z = this.direction.y * this.speed;
+  this.position.x += this.velocity.x * deltaTime;
+  this.position.z += this.velocity.z * deltaTime;
+  
+  // Keep in bounds
+  if (Math.abs(this.position.x) > 70) {
+    this.position.x = Math.sign(this.position.x) * 70;
+    this.direction.x *= -1;
+  }
+  if (this.position.z > 65 || this.position.z < -50) {
+    this.position.z = Math.max(-50, Math.min(65, this.position.z));
+    this.direction.y *= -1;
+  }
+  
+  if (this.velocity.length() > 0.05) {
+    const angle = Math.atan2(this.velocity.x, this.velocity.z);
+    this.mesh.rotation.y = angle;
+  }
 }
 
-// Always update height and position so people stay visible on water
-const waveHeight = (ocean && ocean.getHeightAt) ? ocean.getHeightAt(this.position.x, this.position.z) : 0;
-this.position.y = waveHeight - 0.2 + Math.sin(this.time) * 0.15;
+// Update height based on location
+let baseY = 0;
+if (this.position.z < -25) {
+  // On beach
+  baseY = -0.5;
+} else {
+  // In water
+  const waveHeight = (ocean && ocean.getHeightAt) ? ocean.getHeightAt(this.position.x, this.position.z) : 0;
+  baseY = waveHeight - 0.3 + Math.sin(this.time) * 0.1;
+}
+
+if (this.activity !== 'lying') {
+  this.position.y = baseY;
+}
 this.mesh.position.copy(this.position);
 }
 
 remove() {
 scene.remove(this.mesh);
+this.mesh.traverse(child => {
+  if (child.geometry) child.geometry.dispose();
+  if (child.material) child.material.dispose();
+});
 }
+}
+
+// Beach objects (towels, umbrellas, etc.)
+let beachTowels = [];
+let beachUmbrellas = [];
+let sandcastles = [];
+let beachBalls = [];
+
+function createBeachItems() {
+console.log('Creating beach items...');
+
+// Beach towels
+const towelColors = [0xff6b6b, 0x4ecdc4, 0xf9ca24, 0x45b7d1, 0x9b59b6, 0x2ecc71, 0xff8c42, 0x3498db];
+for (let i = 0; i < 12; i++) {
+  const towelGeo = new THREE.BoxGeometry(1.2, 0.02, 2);
+  const towelMat = new THREE.MeshStandardMaterial({ 
+    color: towelColors[Math.floor(Math.random() * towelColors.length)],
+    roughness: 0.9
+  });
+  const towel = new THREE.Mesh(towelGeo, towelMat);
+  towel.position.set(
+    (Math.random() - 0.5) * 80,
+    -0.48,
+    -35 - Math.random() * 20
+  );
+  towel.rotation.y = Math.random() * Math.PI;
+  towel.receiveShadow = true;
+  scene.add(towel);
+  beachTowels.push(towel);
+}
+
+// Beach umbrellas
+for (let i = 0; i < 8; i++) {
+  const umbrellaGroup = new THREE.Group();
+  
+  // Pole
+  const poleGeo = new THREE.CylinderGeometry(0.05, 0.05, 3, 8);
+  const poleMat = new THREE.MeshStandardMaterial({ color: 0xdddddd, metalness: 0.5 });
+  const pole = new THREE.Mesh(poleGeo, poleMat);
+  pole.position.y = 1.5;
+  pole.castShadow = true;
+  umbrellaGroup.add(pole);
+  
+  // Canopy
+  const canopyGeo = new THREE.ConeGeometry(1.8, 0.8, 16, 1, true);
+  const canopyMat = new THREE.MeshStandardMaterial({ 
+    color: towelColors[Math.floor(Math.random() * towelColors.length)],
+    side: THREE.DoubleSide,
+    roughness: 0.8
+  });
+  const canopy = new THREE.Mesh(canopyGeo, canopyMat);
+  canopy.position.y = 2.8;
+  canopy.rotation.x = Math.PI;
+  canopy.castShadow = true;
+  umbrellaGroup.add(canopy);
+  
+  umbrellaGroup.position.set(
+    (Math.random() - 0.5) * 70,
+    -0.5,
+    -38 - Math.random() * 15
+  );
+  scene.add(umbrellaGroup);
+  beachUmbrellas.push(umbrellaGroup);
+}
+
+// Sandcastles
+for (let i = 0; i < 5; i++) {
+  const castleGroup = new THREE.Group();
+  const sandMat = new THREE.MeshStandardMaterial({ color: 0xd4b896, roughness: 0.95 });
+  
+  // Main tower
+  const towerGeo = new THREE.CylinderGeometry(0.3, 0.4, 0.6, 12);
+  const tower = new THREE.Mesh(towerGeo, sandMat);
+  tower.position.y = 0.3;
+  tower.castShadow = true;
+  castleGroup.add(tower);
+  
+  // Tower top
+  const topGeo = new THREE.ConeGeometry(0.35, 0.3, 12);
+  const top = new THREE.Mesh(topGeo, sandMat);
+  top.position.y = 0.7;
+  top.castShadow = true;
+  castleGroup.add(top);
+  
+  // Small towers
+  for (let j = 0; j < 4; j++) {
+    const angle = (j / 4) * Math.PI * 2;
+    const smallTowerGeo = new THREE.CylinderGeometry(0.15, 0.2, 0.4, 10);
+    const smallTower = new THREE.Mesh(smallTowerGeo, sandMat);
+    smallTower.position.set(Math.cos(angle) * 0.5, 0.2, Math.sin(angle) * 0.5);
+    smallTower.castShadow = true;
+    castleGroup.add(smallTower);
+    
+    const smallTopGeo = new THREE.ConeGeometry(0.18, 0.2, 10);
+    const smallTop = new THREE.Mesh(smallTopGeo, sandMat);
+    smallTop.position.set(Math.cos(angle) * 0.5, 0.5, Math.sin(angle) * 0.5);
+    smallTop.castShadow = true;
+    castleGroup.add(smallTop);
+  }
+  
+  castleGroup.position.set(
+    (Math.random() - 0.5) * 60,
+    -0.5,
+    -32 - Math.random() * 10
+  );
+  castleGroup.scale.setScalar(0.8 + Math.random() * 0.4);
+  scene.add(castleGroup);
+  sandcastles.push(castleGroup);
+}
+
+// Beach balls
+for (let i = 0; i < 6; i++) {
+  const ballGeo = new THREE.SphereGeometry(0.25, 20, 16);
+  const ballMat = new THREE.MeshStandardMaterial({ 
+    color: [0xff0000, 0x0000ff, 0xffff00, 0x00ff00][Math.floor(Math.random() * 4)],
+    roughness: 0.3
+  });
+  const ball = new THREE.Mesh(ballGeo, ballMat);
+  ball.position.set(
+    (Math.random() - 0.5) * 80,
+    -0.25,
+    -25 - Math.random() * 25
+  );
+  ball.castShadow = true;
+  ball.userData.velocity = new THREE.Vector3(
+    (Math.random() - 0.5) * 0.5,
+    0,
+    (Math.random() - 0.5) * 0.5
+  );
+  scene.add(ball);
+  beachBalls.push(ball);
+}
+
+console.log('Beach items created ✓');
+}
+
+function updateBeachBalls(deltaTime) {
+beachBalls.forEach(ball => {
+  // Simple bouncing physics
+  ball.position.add(ball.userData.velocity.clone().multiplyScalar(deltaTime));
+  
+  // Bounce off boundaries
+  if (Math.abs(ball.position.x) > 40) {
+    ball.userData.velocity.x *= -0.9;
+    ball.position.x = Math.sign(ball.position.x) * 40;
+  }
+  if (ball.position.z > -20 || ball.position.z < -50) {
+    ball.userData.velocity.z *= -0.9;
+    ball.position.z = Math.max(-50, Math.min(-20, ball.position.z));
+  }
+  
+  // Slow down
+  ball.userData.velocity.multiplyScalar(0.995);
+  
+  // Rotate
+  ball.rotation.x += ball.userData.velocity.z * 2;
+  ball.rotation.z -= ball.userData.velocity.x * 2;
+});
 }
 
 function updatePeople() {
+// Mix of water and beach people
 while (people.length < CONFIG.peopleCount) {
-const x = (Math.random() - 0.5) * 100;
-const z = (Math.random() - 0.5) * 80;
-people.push(new Person(new THREE.Vector3(x, 0, z)));
+  const isBeachPerson = Math.random() < 0.4;
+  let x, z, activity;
+  
+  if (isBeachPerson) {
+    x = (Math.random() - 0.5) * 80;
+    z = -35 - Math.random() * 18;
+    activity = Math.random() < 0.5 ? 'sitting' : (Math.random() < 0.5 ? 'lying' : 'standing');
+  } else {
+    x = (Math.random() - 0.5) * 100;
+    z = (Math.random() - 0.3) * 60;
+    activity = Math.random() < 0.7 ? 'walking' : 'standing';
+  }
+  
+  people.push(new HighPolyPerson(new THREE.Vector3(x, 0, z), { activity }));
 }
 
 while (people.length > CONFIG.peopleCount) {
-const person = people.pop();
-person.remove();
+  const person = people.pop();
+  person.remove();
 }
 
 document.getElementById('peopleCount').textContent = people.length;
@@ -1478,6 +2230,7 @@ if (ocean) ocean.update(deltaTime);
 people.forEach(person => person.update(deltaTime));
 if (particleSystem) particleSystem.update(deltaTime);
 if (birdsSystem) birdsSystem.update(deltaTime);
+updateBeachBalls(deltaTime);
 
 updateTimeOfDayLighting();
 
@@ -1497,11 +2250,14 @@ lastFpsUpdate = currentTime;
 // ==========================================
 
 const LOADING_TIPS = [
-'Try the Sunset preset for golden hour.',
+'Try the Sunset preset for golden hour lighting.',
 'Right-click anywhere to add people or create waves.',
-'Use the Time of Day slider to see dawn and dusk.',
-'Particle mode runs better on older devices.',
-'Generate Big Wave for instant splashes!'
+'Use the Time of Day slider to experience dawn, noon, and dusk.',
+'Circle Particle mode shows 6400+ animated water droplets.',
+'Watch the foam line move with the waves near the shore.',
+'People have 500+ polygons with realistic proportions.',
+'Beach towels, umbrellas, and sandcastles dot the shoreline.',
+'Birds fly overhead in realistic patterns.'
 ];
 
 function init() {
@@ -1525,17 +2281,23 @@ setupLighting();
 }, 300);
 
 setTimeout(() => {
-progress.style.width = '60%';
+progress.style.width = '55%';
 status.textContent = 'Creating beach...';
 createBeach();
 }, 500);
+
+setTimeout(() => {
+progress.style.width = '65%';
+status.textContent = 'Adding beach items...';
+createBeachItems();
+}, 600);
 
 setTimeout(() => {
 progress.style.width = '75%';
 status.textContent = 'Creating water system...';
 ocean = new MeshWaterSystem();
 particleSystem = new SplashParticleSystem();
-}, 700);
+}, 750);
 
 setTimeout(() => {
 progress.style.width = '88%';
