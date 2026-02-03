@@ -2078,12 +2078,89 @@ if ((this.activity.includes('building') || this.activity.includes('digging') || 
 }
 
 update(deltaTime) {
-if (!CONFIG.animatePeople) return;
-
 this.time += deltaTime * 2;
 this.changeTimer += deltaTime;
 this.animPhase += deltaTime * 4;
 this.activityTimer += deltaTime;
+
+// ========== ALWAYS-ON IDLE ANIMATIONS (makes people look alive) ==========
+// These subtle animations run constantly regardless of activity
+
+// Breathing animation - subtle chest/torso movement
+const breathCycle = Math.sin(this.time * 1.2);
+const breathAmount = 0.015;
+
+// Weight shifting - subtle body sway  
+const swayCycle = Math.sin(this.time * 0.4 + this.animPhase);
+const swayAmount = 0.02;
+
+// Head micro-movements - looking around subtly
+const headLookX = Math.sin(this.time * 0.3 + this.position.x) * 0.08;
+const headLookY = Math.sin(this.time * 0.5 + this.position.z) * 0.06;
+
+// Subtle fidgeting/twitching
+const fidgetCycle = Math.sin(this.time * 3 + this.animPhase * 2);
+const fidgetAmount = 0.02;
+
+// Apply breathing - scale torso slightly
+if (this.mesh) {
+  // Subtle breathing motion on Y scale
+  this.mesh.scale.y = (this.isChild ? 0.6 : 1) * 1.3 * (1 + breathCycle * breathAmount);
+}
+
+// Apply subtle swaying/weight shift (not during movement or lying down)
+const lyingPoses = ['lying_back', 'lying_front', 'lying_side', 'making_sand_angel', 'floating', 
+  'swimming', 'swimming_backstroke', 'swimming_breaststroke', 'snorkeling', 'bodyboarding', 
+  'doggy_paddle', 'doing_pushups', 'doing_situps'];
+const notLying = !lyingPoses.includes(this.activity);
+
+if (notLying) {
+  // Subtle body sway
+  this.mesh.rotation.z = swayCycle * swayAmount;
+  
+  // Random occasional larger movements (scratching, adjusting, etc.)
+  if (Math.random() < 0.001) {
+    // Occasional head turn
+    this.mesh.rotation.y += (Math.random() - 0.5) * 0.3;
+  }
+}
+
+// Arm micro-fidgeting (when not doing specific arm activities)
+const armActivities = ['swimming', 'waving', 'stretching', 'dancing', 'hula_dance', 
+  'building_sandcastle', 'digging_sand', 'playing_frisbee', 'playing_volleyball',
+  'doing_pushups', 'splashing', 'treading_water'];
+const canFidgetArms = !armActivities.includes(this.activity);
+
+if (canFidgetArms && this.limbRefs.upperArmL && this.limbRefs.upperArmR) {
+  // Subtle arm swinging/adjustment
+  this.limbRefs.upperArmL.rotation.z = (this.limbRefs.upperArmL.rotation.z || 0) + fidgetCycle * fidgetAmount * 0.5;
+  this.limbRefs.upperArmR.rotation.z = (this.limbRefs.upperArmR.rotation.z || 0) - fidgetCycle * fidgetAmount * 0.5;
+}
+
+// Subtle knee bend variation for standing poses
+const standingPoses = ['standing', 'standing_in_water', 'waving', 'pointing', 'talking', 'laughing', 'taking_photo'];
+if (standingPoses.includes(this.activity)) {
+  if (this.limbRefs.thighL) {
+    this.limbRefs.thighL.rotation.x += Math.sin(this.time * 0.8) * 0.02;
+  }
+  if (this.limbRefs.thighR) {
+    this.limbRefs.thighR.rotation.x += Math.sin(this.time * 0.8 + 1) * 0.02;
+  }
+}
+
+// Random blinking simulation (head nod)
+if (Math.random() < 0.002) {
+  // Quick head dip for "blink"
+  setTimeout(() => {
+    if (this.mesh) this.mesh.rotation.x += 0.05;
+  }, 0);
+  setTimeout(() => {
+    if (this.mesh) this.mesh.rotation.x -= 0.05;
+  }, 100);
+}
+
+// ========== ACTIVITY-SPECIFIC ANIMATIONS ==========
+if (!CONFIG.animatePeople) return;
 
 // Check if time to change activity (5-60 seconds)
 if (this.activityTimer >= this.activityDuration) {
@@ -2982,9 +3059,13 @@ physicsObjects.forEach(obj => {
   const v = obj.userData.velocity;
   const w = obj.userData.weight || 1;
   const av = obj.userData.angularVelocity;
+  const wasInWater = obj.userData.wasInWater || false;
   
   // Apply gravity (heavier = faster fall)
   v.y += gravity * w * deltaTime;
+  
+  // Store previous Y for splash detection
+  const prevY = obj.position.y;
   
   // Update position
   obj.position.add(v.clone().multiplyScalar(deltaTime));
@@ -2996,26 +3077,70 @@ physicsObjects.forEach(obj => {
   
   // Ground collision
   const objRadius = obj.userData.type === 'sphere' ? 0.5 * CONFIG.objectScale : 0.5 * CONFIG.objectScale;
+  const objScale = obj.userData.type === 'model' ? CONFIG.modelScale : CONFIG.objectScale;
   
   // Check if in water or on beach
   let floorLevel = groundLevel;
-  if (obj.position.z > -15) {
-    // In water area - bob on waves
-    const waveH = ocean ? ocean.getHeightAt(obj.position.x, obj.position.z) : 0;
+  const inWaterZone = obj.position.z > -15;
+  
+  if (inWaterZone && ocean) {
+    const waveH = ocean.getHeightAt(obj.position.x, obj.position.z);
     floorLevel = waveH - objRadius * 0.3;
     
-    // Water drag
-    if (obj.position.y < waveH + objRadius) {
-      v.multiplyScalar(0.95);
-      av.multiplyScalar(0.95);
-      // Buoyancy (lighter objects float more)
-      v.y += (1 / w) * 3 * deltaTime;
+    // Check if object is touching water surface
+    const touchingWater = obj.position.y < waveH + objRadius;
+    
+    if (touchingWater) {
+      // Calculate impact velocity for splash intensity
+      const impactSpeed = Math.abs(v.y);
+      const splashIntensity = Math.min(2, impactSpeed * w * 0.2);
+      
+      // First time entering water - big splash!
+      if (!wasInWater && impactSpeed > 1) {
+        // Create splash based on weight and velocity
+        if (particleSystem) {
+          particleSystem.createSplash(obj.position.x, waveH, obj.position.z, splashIntensity * w);
+        }
+        // Create water disturbance ripples based on weight
+        ocean.disturb(obj.position.x, obj.position.z, splashIntensity * w);
+      }
+      
+      // Continuous water interaction while in water
+      if (Math.random() < 0.15 * w) {
+        // Heavier objects create more disturbance
+        ocean.disturb(obj.position.x, obj.position.z, 0.2 * w);
+        
+        // Create small continuous splashes
+        if (particleSystem && Math.random() < 0.3) {
+          particleSystem.createRipple(obj.position.x, waveH, obj.position.z);
+        }
+      }
+      
+      // Water drag - heavier objects have more momentum
+      const dragFactor = 0.92 + (w * 0.02); // Heavy objects less affected by drag
+      v.multiplyScalar(Math.min(0.99, dragFactor));
+      av.multiplyScalar(0.92);
+      
+      // Buoyancy (lighter objects float more, heavy objects sink)
+      const buoyancyForce = (1 / w) * 4 - (w * 0.5);
+      v.y += buoyancyForce * deltaTime;
+      
+      // Very heavy objects sink to bottom
+      if (w > 3) {
+        floorLevel = waveH - 2 - (w * 0.5);
+      }
+      
+      obj.userData.wasInWater = true;
+    } else {
+      obj.userData.wasInWater = false;
     }
+  } else {
+    obj.userData.wasInWater = false;
   }
   
   if (obj.position.y - objRadius < floorLevel) {
     obj.position.y = floorLevel + objRadius;
-    v.y *= -bounceFactor;
+    v.y *= -bounceFactor / w; // Heavy objects bounce less
     v.x *= damping;
     v.z *= damping;
     av.multiplyScalar(0.8);
