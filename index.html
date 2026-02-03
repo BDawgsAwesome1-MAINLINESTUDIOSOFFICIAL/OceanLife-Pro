@@ -780,6 +780,71 @@ let physicsObjects = [];
 let importedModel = null;
 let gltfLoader, objLoader;
 
+// WASD Movement controls (global scope)
+const moveState = { forward: false, backward: false, left: false, right: false, up: false, down: false };
+const moveSpeed = 1.5;
+
+function setupWASDControls() {
+window.addEventListener('keydown', (e) => {
+  switch(e.code) {
+    case 'KeyW': case 'ArrowUp': moveState.forward = true; break;
+    case 'KeyS': case 'ArrowDown': moveState.backward = true; break;
+    case 'KeyA': case 'ArrowLeft': moveState.left = true; break;
+    case 'KeyD': case 'ArrowRight': moveState.right = true; break;
+    case 'KeyQ': case 'Space': moveState.up = true; break;
+    case 'KeyE': case 'ShiftLeft': moveState.down = true; break;
+  }
+});
+
+window.addEventListener('keyup', (e) => {
+  switch(e.code) {
+    case 'KeyW': case 'ArrowUp': moveState.forward = false; break;
+    case 'KeyS': case 'ArrowDown': moveState.backward = false; break;
+    case 'KeyA': case 'ArrowLeft': moveState.left = false; break;
+    case 'KeyD': case 'ArrowRight': moveState.right = false; break;
+    case 'KeyQ': case 'Space': moveState.up = false; break;
+    case 'KeyE': case 'ShiftLeft': moveState.down = false; break;
+  }
+});
+}
+
+function updateCameraMovement() {
+if (!camera || !controls) return;
+
+const direction = new THREE.Vector3();
+camera.getWorldDirection(direction);
+direction.y = 0;
+direction.normalize();
+
+const right = new THREE.Vector3();
+right.crossVectors(direction, new THREE.Vector3(0, 1, 0));
+
+if (moveState.forward) {
+  camera.position.addScaledVector(direction, moveSpeed);
+  controls.target.addScaledVector(direction, moveSpeed);
+}
+if (moveState.backward) {
+  camera.position.addScaledVector(direction, -moveSpeed);
+  controls.target.addScaledVector(direction, -moveSpeed);
+}
+if (moveState.left) {
+  camera.position.addScaledVector(right, -moveSpeed);
+  controls.target.addScaledVector(right, -moveSpeed);
+}
+if (moveState.right) {
+  camera.position.addScaledVector(right, moveSpeed);
+  controls.target.addScaledVector(right, moveSpeed);
+}
+if (moveState.up) {
+  camera.position.y += moveSpeed;
+  controls.target.y += moveSpeed;
+}
+if (moveState.down) {
+  camera.position.y = Math.max(2, camera.position.y - moveSpeed);
+  controls.target.y = Math.max(0, controls.target.y - moveSpeed);
+}
+}
+
 // ==========================================
 // SCENE SETUP
 // ==========================================
@@ -817,66 +882,8 @@ controls.minDistance = 5;
 controls.maxDistance = 350;
 controls.target.set(0, 0, -10);
 
-// WASD Movement controls
-const moveState = { forward: false, backward: false, left: false, right: false, up: false, down: false };
-const moveSpeed = 1.5;
-
-window.addEventListener('keydown', (e) => {
-  switch(e.code) {
-    case 'KeyW': case 'ArrowUp': moveState.forward = true; break;
-    case 'KeyS': case 'ArrowDown': moveState.backward = true; break;
-    case 'KeyA': case 'ArrowLeft': moveState.left = true; break;
-    case 'KeyD': case 'ArrowRight': moveState.right = true; break;
-    case 'KeyQ': case 'Space': moveState.up = true; break;
-    case 'KeyE': case 'ShiftLeft': moveState.down = true; break;
-  }
-});
-
-window.addEventListener('keyup', (e) => {
-  switch(e.code) {
-    case 'KeyW': case 'ArrowUp': moveState.forward = false; break;
-    case 'KeyS': case 'ArrowDown': moveState.backward = false; break;
-    case 'KeyA': case 'ArrowLeft': moveState.left = false; break;
-    case 'KeyD': case 'ArrowRight': moveState.right = false; break;
-    case 'KeyQ': case 'Space': moveState.up = false; break;
-    case 'KeyE': case 'ShiftLeft': moveState.down = false; break;
-  }
-});
-
-function updateCameraMovement() {
-  const direction = new THREE.Vector3();
-  camera.getWorldDirection(direction);
-  direction.y = 0;
-  direction.normalize();
-  
-  const right = new THREE.Vector3();
-  right.crossVectors(direction, new THREE.Vector3(0, 1, 0));
-  
-  if (moveState.forward) {
-    camera.position.addScaledVector(direction, moveSpeed);
-    controls.target.addScaledVector(direction, moveSpeed);
-  }
-  if (moveState.backward) {
-    camera.position.addScaledVector(direction, -moveSpeed);
-    controls.target.addScaledVector(direction, -moveSpeed);
-  }
-  if (moveState.left) {
-    camera.position.addScaledVector(right, -moveSpeed);
-    controls.target.addScaledVector(right, -moveSpeed);
-  }
-  if (moveState.right) {
-    camera.position.addScaledVector(right, moveSpeed);
-    controls.target.addScaledVector(right, moveSpeed);
-  }
-  if (moveState.up) {
-    camera.position.y += moveSpeed;
-    controls.target.y += moveSpeed;
-  }
-  if (moveState.down) {
-    camera.position.y = Math.max(2, camera.position.y - moveSpeed);
-    controls.target.y = Math.max(0, controls.target.y - moveSpeed);
-  }
-}
+// Setup WASD controls
+setupWASDControls();
 
 console.log('Scene initialized ✓');
 }
