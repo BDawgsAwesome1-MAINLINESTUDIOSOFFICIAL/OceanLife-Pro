@@ -813,9 +813,70 @@ controls = new THREE.OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.08;
 controls.maxPolarAngle = Math.PI / 2.05;
-controls.minDistance = 15;
-controls.maxDistance = 250;
+controls.minDistance = 5;
+controls.maxDistance = 350;
 controls.target.set(0, 0, -10);
+
+// WASD Movement controls
+const moveState = { forward: false, backward: false, left: false, right: false, up: false, down: false };
+const moveSpeed = 1.5;
+
+window.addEventListener('keydown', (e) => {
+  switch(e.code) {
+    case 'KeyW': case 'ArrowUp': moveState.forward = true; break;
+    case 'KeyS': case 'ArrowDown': moveState.backward = true; break;
+    case 'KeyA': case 'ArrowLeft': moveState.left = true; break;
+    case 'KeyD': case 'ArrowRight': moveState.right = true; break;
+    case 'KeyQ': case 'Space': moveState.up = true; break;
+    case 'KeyE': case 'ShiftLeft': moveState.down = true; break;
+  }
+});
+
+window.addEventListener('keyup', (e) => {
+  switch(e.code) {
+    case 'KeyW': case 'ArrowUp': moveState.forward = false; break;
+    case 'KeyS': case 'ArrowDown': moveState.backward = false; break;
+    case 'KeyA': case 'ArrowLeft': moveState.left = false; break;
+    case 'KeyD': case 'ArrowRight': moveState.right = false; break;
+    case 'KeyQ': case 'Space': moveState.up = false; break;
+    case 'KeyE': case 'ShiftLeft': moveState.down = false; break;
+  }
+});
+
+function updateCameraMovement() {
+  const direction = new THREE.Vector3();
+  camera.getWorldDirection(direction);
+  direction.y = 0;
+  direction.normalize();
+  
+  const right = new THREE.Vector3();
+  right.crossVectors(direction, new THREE.Vector3(0, 1, 0));
+  
+  if (moveState.forward) {
+    camera.position.addScaledVector(direction, moveSpeed);
+    controls.target.addScaledVector(direction, moveSpeed);
+  }
+  if (moveState.backward) {
+    camera.position.addScaledVector(direction, -moveSpeed);
+    controls.target.addScaledVector(direction, -moveSpeed);
+  }
+  if (moveState.left) {
+    camera.position.addScaledVector(right, -moveSpeed);
+    controls.target.addScaledVector(right, -moveSpeed);
+  }
+  if (moveState.right) {
+    camera.position.addScaledVector(right, moveSpeed);
+    controls.target.addScaledVector(right, moveSpeed);
+  }
+  if (moveState.up) {
+    camera.position.y += moveSpeed;
+    controls.target.y += moveSpeed;
+  }
+  if (moveState.down) {
+    camera.position.y = Math.max(2, camera.position.y - moveSpeed);
+    controls.target.y = Math.max(0, controls.target.y - moveSpeed);
+  }
+}
 
 console.log('Scene initialized ✓');
 }
@@ -1537,7 +1598,7 @@ this.animPhase = Math.random() * Math.PI * 2;
 
 // Animation transition system
 this.activityTimer = 0;
-this.activityDuration = 5 + Math.random() * 55; // 5-60 seconds
+this.activityDuration = 3 + Math.random() * 12; // 3-15 seconds for more active movement
 this.transitionProgress = 0;
 this.isTransitioning = false;
 this.previousActivity = null;
@@ -1547,13 +1608,23 @@ this.skinTone = options.skinTone || SKIN_TONES[Math.floor(Math.random() * SKIN_T
 this.hairColor = options.hairColor || HAIR_COLORS[Math.floor(Math.random() * HAIR_COLORS.length)];
 this.swimColor = options.swimColor || SWIMWEAR_COLORS[Math.floor(Math.random() * SWIMWEAR_COLORS.length)];
 this.bodyType = options.bodyType || BODY_TYPES[Math.floor(Math.random() * BODY_TYPES.length)];
-// Assign activity based on location
+// Assign activity based on location - favor movement activities
 if (this.position.z < -20) {
-  // On beach
-  this.activity = options.activity || ALL_BEACH_ACTIVITIES[Math.floor(Math.random() * ALL_BEACH_ACTIVITIES.length)];
+  // On beach - 60% chance of walking/movement
+  if (Math.random() < 0.6) {
+    const moveActivities = ['walking_slow', 'walking_fast', 'jogging', 'running', 'skipping'];
+    this.activity = options.activity || moveActivities[Math.floor(Math.random() * moveActivities.length)];
+  } else {
+    this.activity = options.activity || ALL_BEACH_ACTIVITIES[Math.floor(Math.random() * ALL_BEACH_ACTIVITIES.length)];
+  }
 } else {
-  // In water
-  this.activity = options.activity || ALL_WATER_ACTIVITIES[Math.floor(Math.random() * ALL_WATER_ACTIVITIES.length)];
+  // In water - 70% chance of swimming/moving
+  if (Math.random() < 0.7) {
+    const waterMoveActivities = ['swimming', 'wading', 'walking_in_water', 'splashing', 'playing_in_waves'];
+    this.activity = options.activity || waterMoveActivities[Math.floor(Math.random() * waterMoveActivities.length)];
+  } else {
+    this.activity = options.activity || ALL_WATER_ACTIVITIES[Math.floor(Math.random() * ALL_WATER_ACTIVITIES.length)];
+  }
 }
 
 this.isMale = Math.random() > 0.5;
@@ -1799,50 +1870,80 @@ if (hairStyle === 0) {
   group.add(buzz);
 }
 
-// ========== ARMS (high poly with hands) ==========
-// Upper arms
-const upperArmGeo = new THREE.CylinderGeometry(0.045, 0.05, 0.22, 12, 2);
+// ========== ARMS (properly jointed) ==========
+// Shoulders (connection points)
+const shoulderGeo = new THREE.SphereGeometry(0.06, 10, 8);
+const shoulderL = new THREE.Mesh(shoulderGeo, skinMat);
+shoulderL.position.set(-0.24 * bt.shoulderWidth, 0.38, 0);
+shoulderL.castShadow = true;
+group.add(shoulderL);
+
+const shoulderR = new THREE.Mesh(shoulderGeo, skinMat);
+shoulderR.position.set(0.24 * bt.shoulderWidth, 0.38, 0);
+shoulderR.castShadow = true;
+group.add(shoulderR);
+
+// Upper arms (attached to shoulders)
+const upperArmGeo = new THREE.CylinderGeometry(0.05, 0.055, 0.25, 10);
 const upperArmL = new THREE.Mesh(upperArmGeo, skinMat);
-upperArmL.position.set(-0.26 * bt.shoulderWidth, 0.32, 0);
-upperArmL.rotation.z = 0.3;
+upperArmL.position.set(-0.28 * bt.shoulderWidth, 0.24, 0);
+upperArmL.rotation.z = 0.15;
 upperArmL.castShadow = true;
 group.add(upperArmL);
 this.limbRefs.upperArmL = upperArmL;
 
 const upperArmR = new THREE.Mesh(upperArmGeo, skinMat);
-upperArmR.position.set(0.26 * bt.shoulderWidth, 0.32, 0);
-upperArmR.rotation.z = -0.3;
+upperArmR.position.set(0.28 * bt.shoulderWidth, 0.24, 0);
+upperArmR.rotation.z = -0.15;
 upperArmR.castShadow = true;
 group.add(upperArmR);
 this.limbRefs.upperArmR = upperArmR;
 
+// Elbows
+const elbowGeo = new THREE.SphereGeometry(0.045, 8, 6);
+const elbowL = new THREE.Mesh(elbowGeo, skinMat);
+elbowL.position.set(-0.30 * bt.shoulderWidth, 0.10, 0);
+elbowL.castShadow = true;
+group.add(elbowL);
+
+const elbowR = new THREE.Mesh(elbowGeo, skinMat);
+elbowR.position.set(0.30 * bt.shoulderWidth, 0.10, 0);
+elbowR.castShadow = true;
+group.add(elbowR);
+
 // Forearms
-const forearmGeo = new THREE.CylinderGeometry(0.035, 0.045, 0.2, 12, 2);
+const forearmGeo = new THREE.CylinderGeometry(0.04, 0.05, 0.22, 10);
 const forearmL = new THREE.Mesh(forearmGeo, skinMat);
-forearmL.position.set(-0.35 * bt.shoulderWidth, 0.18, 0);
-forearmL.rotation.z = 0.5;
+forearmL.position.set(-0.30 * bt.shoulderWidth, -0.02, 0);
 forearmL.castShadow = true;
 group.add(forearmL);
 this.limbRefs.forearmL = forearmL;
 
 const forearmR = new THREE.Mesh(forearmGeo, skinMat);
-forearmR.position.set(0.35 * bt.shoulderWidth, 0.18, 0);
-forearmR.rotation.z = -0.5;
+forearmR.position.set(0.30 * bt.shoulderWidth, -0.02, 0);
 forearmR.castShadow = true;
 group.add(forearmR);
 this.limbRefs.forearmR = forearmR;
 
-// Hands
-const handGeo = new THREE.BoxGeometry(0.06, 0.08, 0.03, 2, 2, 1);
+// Wrists
+const wristGeo = new THREE.SphereGeometry(0.035, 8, 6);
+const wristL = new THREE.Mesh(wristGeo, skinMat);
+wristL.position.set(-0.30 * bt.shoulderWidth, -0.14, 0);
+group.add(wristL);
+
+const wristR = new THREE.Mesh(wristGeo, skinMat);
+wristR.position.set(0.30 * bt.shoulderWidth, -0.14, 0);
+group.add(wristR);
+
+// Hands (more detailed)
+const handGeo = new THREE.BoxGeometry(0.07, 0.09, 0.035, 2, 2, 1);
 const handL = new THREE.Mesh(handGeo, skinMat);
-handL.position.set(-0.42 * bt.shoulderWidth, 0.06, 0);
-handL.rotation.z = 0.4;
+handL.position.set(-0.30 * bt.shoulderWidth, -0.20, 0);
 handL.castShadow = true;
 group.add(handL);
 
 const handR = new THREE.Mesh(handGeo, skinMat);
-handR.position.set(0.42 * bt.shoulderWidth, 0.06, 0);
-handR.rotation.z = -0.4;
+handR.position.set(0.30 * bt.shoulderWidth, -0.20, 0);
 handR.castShadow = true;
 group.add(handR);
 
@@ -2058,7 +2159,7 @@ do {
 } while (newActivity === this.activity && activityList.length > 1);
 
 this.activity = newActivity;
-this.activityDuration = 5 + Math.random() * 55; // 5-60 seconds
+this.activityDuration = 3 + Math.random() * 12; // 3-15 seconds for more active movement
 this.activityTimer = 0;
 this.buildingState = 0;
 this.buildingProgress = 0;
@@ -3338,6 +3439,7 @@ updatePhysicsObjects(deltaTime);
 
 updateTimeOfDayLighting();
 
+updateCameraMovement();
 controls.update();
 renderer.render(scene, camera);
 
@@ -3354,14 +3456,14 @@ lastFpsUpdate = currentTime;
 // ==========================================
 
 const LOADING_TIPS = [
+'Use WASD keys to move around and explore!',
+'Press Q to go up, E to go down.',
 'Try the Sunset preset for golden hour lighting.',
 'Right-click anywhere to add people or create waves.',
-'Use the Time of Day slider to experience dawn, noon, and dusk.',
 'Drop boxes and spheres from the Physics Sandbox!',
-'Watch people build sandcastles on the beach.',
+'Watch people walk around and build sandcastles.',
 'Import your own 3D models (GLB/OBJ) and drop them!',
-'Adjust object weight - heavy objects sink, light ones float.',
-'Birds fly overhead in patterns.'
+'Heavy objects sink, light ones float in water.'
 ];
 
 function showSplashScreen() {
