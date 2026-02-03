@@ -3,24 +3,24 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>OceanLife Pro - Hyperrealistic Beach Simulation</title>
+<title>OceanLife Pro - Interactive Beach Simulation</title>
 
 <!-- SEO & Social -->
-<meta name="description" content="Experience a breathtaking hyperrealistic beach simulation with dynamic waves, lifelike people, and stunning visuals. Built with Three.js.">
+<meta name="description" content="Interactive beach simulation with dynamic waves, animated people, and physics sandbox. Drop objects, import 3D models, and explore. Built with Three.js.">
 <meta name="keywords" content="beach simulation, ocean, waves, Three.js, WebGL, 3D, interactive, realistic">
 <meta name="author" content="OceanLife Pro">
 <meta name="theme-color" content="#0a4d6e">
 
 <!-- Open Graph / Facebook -->
 <meta property="og:type" content="website">
-<meta property="og:title" content="OceanLife Pro - Hyperrealistic Beach Simulation">
-<meta property="og:description" content="Experience a breathtaking hyperrealistic beach simulation with dynamic waves and lifelike people.">
+<meta property="og:title" content="OceanLife Pro - Interactive Beach Simulation">
+<meta property="og:description" content="Interactive beach simulation with physics sandbox. Drop objects, import 3D models, and explore.">
 <meta property="og:image" content="https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=1200">
 
 <!-- Twitter -->
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="OceanLife Pro - Hyperrealistic Beach Simulation">
-<meta name="twitter:description" content="Experience a breathtaking hyperrealistic beach simulation.">
+<meta name="twitter:title" content="OceanLife Pro - Interactive Beach Simulation">
+<meta name="twitter:description" content="Interactive beach simulation with physics sandbox.">
 
 <!-- PWA -->
 <link rel="manifest" href="data:application/json,{&quot;name&quot;:&quot;OceanLife Pro&quot;,&quot;short_name&quot;:&quot;OceanLife&quot;,&quot;start_url&quot;:&quot;.&quot;,&quot;display&quot;:&quot;fullscreen&quot;,&quot;background_color&quot;:&quot;%230a4d6e&quot;,&quot;theme_color&quot;:&quot;%230a4d6e&quot;}">
@@ -487,7 +487,7 @@ margin: 8px 12px;
 <div class="wave"></div>
 </div>
 <div class="loading-text">🏖️ OceanLife Pro</div>
-<div class="loading-subtext">Photorealistic Beach Simulation</div>
+<div class="loading-subtext">Interactive Beach Simulation</div>
 <div class="progress-bar">
 <div class="progress-fill" id="progress"></div>
 </div>
@@ -511,12 +511,12 @@ margin: 8px 12px;
 <div class="panel-toggle" onclick="togglePanel()"></div>
 
 <h1>🏖️ OceanLife Pro</h1>
-<div class="subtitle">Hyperrealistic Beach Simulation v4.0</div>
+<div class="subtitle">Interactive Beach Simulation v4.0</div>
 
 <div class="section">
 <div class="section-title">🎬 Rendering Mode</div>
 <select id="renderMode" onchange="switchRenderMode()">
-<option value="ultra">🌟 Ultra Photorealistic (High-End)</option>
+<option value="ultra">🌟 Ultra Quality (Mesh Water)</option>
 <option value="particle">💧 Particle Physics (Low-End)</option>
 <option value="hybrid">⚡ Hybrid Mode</option>
 </select>
@@ -592,11 +592,49 @@ Use Particle mode for older devices
 <button class="secondary" onclick="loadPreset('sunset')">🌇 Sunset</button>
 <button class="secondary" onclick="loadPreset('storm')">⛈️ Storm</button>
 </div>
+
+<div class="section">
+<div class="section-title">📦 Physics Sandbox</div>
+
+<button onclick="dropBox()">📦 Drop Box</button>
+<button onclick="dropSphere()">⚽ Drop Sphere</button>
+
+<div class="control-group">
+<label>Object Weight <span class="value-display" id="weightVal">1.0</span></label>
+<input type="range" id="objectWeight" min="0.1" max="5" value="1" step="0.1" oninput="updateObjectWeight(this.value)">
+</div>
+
+<div class="control-group">
+<label>Object Scale <span class="value-display" id="scaleVal">1.0</span></label>
+<input type="range" id="objectScale" min="0.2" max="3" value="1" step="0.1" oninput="updateObjectScale(this.value)">
+</div>
+
+<button class="secondary" onclick="clearPhysicsObjects()">🗑️ Clear Objects</button>
+</div>
+
+<div class="section">
+<div class="section-title">📁 Import 3D Model</div>
+
+<input type="file" id="modelInput" accept=".glb,.gltf,.obj" style="display:none" onchange="handleModelImport(event)">
+<button onclick="document.getElementById('modelInput').click()">📂 Import GLB/OBJ</button>
+
+<div id="importedModelControls" style="display:none; margin-top:10px;">
+<div class="control-group">
+<label>Model Scale <span class="value-display" id="modelScaleVal">1.0</span></label>
+<input type="range" id="modelScale" min="0.1" max="5" value="1" step="0.1" oninput="updateModelScale(this.value)">
+</div>
+<div class="control-group">
+<label>Model Weight <span class="value-display" id="modelWeightVal">1.0</span></label>
+<input type="range" id="modelWeight" min="0.1" max="10" value="1" step="0.1" oninput="updateModelWeight(this.value)">
+</div>
+<button class="secondary" onclick="dropImportedModel()">📥 Drop Model</button>
+</div>
+</div>
 </div>
 
 <!-- Credits -->
 <div id="credits">
-<strong>OceanLife Pro v4.0</strong> — Drag to orbit · Scroll to zoom · Right-click for menu · High-poly models with 500+ polygons
+<strong>OceanLife Pro v4.0</strong> — Drag to orbit · Scroll to zoom · Right-click for menu · Physics sandbox
 </div>
 
 <!-- Context Menu -->
@@ -615,6 +653,8 @@ Use Particle mode for older devices
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js"></script>
 
 <script>
 console.log('🏖️ OceanLife Pro - Initializing...');
@@ -631,7 +671,11 @@ peopleCount: 8,
 timeOfDay: 12,
 sunIntensity: 1.5,
 animatePeople: true,
-showSplashes: true
+showSplashes: true,
+objectWeight: 1.0,
+objectScale: 1.0,
+modelScale: 1.0,
+modelWeight: 1.0
 };
 
 let scene, camera, renderer, controls;
@@ -641,6 +685,11 @@ let waterParticles = [];
 let sunLight, skyLight, ambientLight;
 let birdsSystem;
 let skyMesh;
+
+// Physics objects
+let physicsObjects = [];
+let importedModel = null;
+let gltfLoader, objLoader;
 
 // ==========================================
 // SCENE SETUP
@@ -793,20 +842,22 @@ class ParticleWaterSystem {
 constructor() {
 console.log('Creating circle particle water system...');
 this.time = 0;
-// 80x80 grid = 6400 particles, ~500+ visible at any time
-this.gridSize = 80;
+// 80x55 grid in water area only (z > -15)
+this.gridSizeX = 80;
+this.gridSizeZ = 55;
 this.spacing = 1.8;
-const total = this.gridSize * this.gridSize;
+const total = this.gridSizeX * this.gridSizeZ;
 
 const positions = new Float32Array(total * 3);
 const colors = new Float32Array(total * 3);
 const sizes = new Float32Array(total);
 
 let idx = 0;
-for (let gz = 0; gz < this.gridSize; gz++) {
-  for (let gx = 0; gx < this.gridSize; gx++) {
-    const x = (gx - this.gridSize / 2) * this.spacing;
-    const z = (gz - this.gridSize / 2) * this.spacing;
+for (let gz = 0; gz < this.gridSizeZ; gz++) {
+  for (let gx = 0; gx < this.gridSizeX; gx++) {
+    const x = (gx - this.gridSizeX / 2) * this.spacing;
+    // Z goes from -12 (near shore) to +85 (ocean)
+    const z = -12 + gz * this.spacing;
     positions[idx * 3] = x;
     positions[idx * 3 + 1] = 0;
     positions[idx * 3 + 2] = z;
@@ -870,11 +921,12 @@ this.time += deltaTime;
 const t = this.time;
 const pos = this.positionArray;
 const col = this.colorArray;
-const gs = this.gridSize;
+const gsX = this.gridSizeX;
+const gsZ = this.gridSizeZ;
 
-for (let gz = 0; gz < gs; gz++) {
-  for (let gx = 0; gx < gs; gx++) {
-    const idx = (gz * gs + gx);
+for (let gz = 0; gz < gsZ; gz++) {
+  for (let gx = 0; gx < gsX; gx++) {
+    const idx = (gz * gsX + gx);
     const x = pos[idx * 3];
     const z = pos[idx * 3 + 2];
     const h = this.waveHeight(x, z, t);
@@ -908,34 +960,41 @@ this.circleTexture.dispose();
 }
 
 // ==========================================
-// HYPERREALISTIC MESH WATER SYSTEM WITH FOAM
+// MESH WATER SYSTEM WITH FOAM
 // ==========================================
 
 class MeshWaterSystem {
 constructor() {
-console.log('Creating hyperrealistic mesh water system with foam...');
+console.log('Creating mesh water system...');
 this.time = 0;
 
-// Main water mesh (256x256 segments for ultra detail)
-const w = 180, h = 180;
-const geometry = new THREE.PlaneGeometry(w, h, 180, 180);
+// Water mesh - stops at shoreline (z = -15), extends to ocean (z = +90)
+const w = 180, h = 105; // Width x Depth
+const segsW = 120, segsH = 70;
+const geometry = new THREE.PlaneGeometry(w, h, segsW, segsH);
 geometry.rotateX(-Math.PI / 2);
 
-// Deep ocean material
+// Shift geometry so it goes from z=-15 (shore) to z=+90 (ocean)
+const positions = geometry.attributes.position.array;
+for (let i = 0; i < positions.length; i += 3) {
+  positions[i + 2] += 37.5; // Shift forward (ocean direction)
+}
+geometry.attributes.position.needsUpdate = true;
+
 const material = new THREE.MeshPhongMaterial({
   color: 0x006699,
   emissive: 0x001525,
   specular: 0xaaddff,
-  shininess: 200,
+  shininess: 150,
   transparent: true,
-  opacity: 0.92,
+  opacity: 0.9,
   side: THREE.DoubleSide,
   depthWrite: true,
   flatShading: false
 });
 
 this.mesh = new THREE.Mesh(geometry, material);
-this.mesh.position.set(0, 0, 0);
+this.mesh.position.set(0, -0.3, 0);
 this.mesh.receiveShadow = true;
 this.mesh.castShadow = true;
 this.mesh.renderOrder = 0;
@@ -957,20 +1016,20 @@ material.vertexColors = true;
 // Shore foam particles
 this.createShoreFoam();
 
-console.log('Hyperrealistic mesh water with foam created ✓');
+console.log('Mesh water created ✓');
 }
 
 createShoreFoam() {
-// Foam line at shore
-const foamCount = 2000;
+// Foam line at shore (z = -15 to z = 5)
+const foamCount = 1500;
 const foamPositions = new Float32Array(foamCount * 3);
 const foamSizes = new Float32Array(foamCount);
 
 for (let i = 0; i < foamCount; i++) {
-  foamPositions[i * 3] = (Math.random() - 0.5) * 160;
+  foamPositions[i * 3] = (Math.random() - 0.5) * 140;
   foamPositions[i * 3 + 1] = 0.1;
-  foamPositions[i * 3 + 2] = -20 + Math.random() * 25 + Math.sin(foamPositions[i * 3] * 0.1) * 5;
-  foamSizes[i] = 0.3 + Math.random() * 0.5;
+  foamPositions[i * 3 + 2] = -12 + Math.random() * 15 + Math.sin(foamPositions[i * 3] * 0.1) * 3;
+  foamSizes[i] = 0.25 + Math.random() * 0.4;
 }
 
 const foamGeo = new THREE.BufferGeometry();
@@ -1081,9 +1140,9 @@ if (this.foam) {
     // Move foam with waves
     foamPos[i * 3 + 2] += Math.sin(t + x * 0.1) * 0.02;
     
-    // Reset foam that drifts too far
-    if (foamPos[i * 3 + 2] < -45 || foamPos[i * 3 + 2] > 5) {
-      foamPos[i * 3 + 2] = -20 + Math.random() * 20;
+    // Reset foam that drifts too far from shore
+    if (foamPos[i * 3 + 2] < -15 || foamPos[i * 3 + 2] > 8) {
+      foamPos[i * 3 + 2] = -10 + Math.random() * 15;
     }
   }
   this.foam.geometry.attributes.position.needsUpdate = true;
@@ -1247,7 +1306,7 @@ console.log('Beach created ✓');
 }
 
 // ==========================================
-// HIGH-POLY PERSON MODEL (500+ polygons)
+// PERSON MODEL
 // ==========================================
 
 // Skin tone library (8 realistic tones)
@@ -1285,7 +1344,7 @@ const BODY_TYPES = [
 ];
 
 // Activity types
-const ACTIVITY_TYPES = ['walking', 'standing', 'sitting', 'lying', 'playing'];
+const ACTIVITY_TYPES = ['walking', 'standing', 'sitting', 'lying', 'building'];
 
 class HighPolyPerson {
 constructor(position, options = {}) {
@@ -1303,16 +1362,94 @@ this.hairColor = options.hairColor || HAIR_COLORS[Math.floor(Math.random() * HAI
 this.swimColor = options.swimColor || SWIMWEAR_COLORS[Math.floor(Math.random() * SWIMWEAR_COLORS.length)];
 this.bodyType = options.bodyType || BODY_TYPES[Math.floor(Math.random() * BODY_TYPES.length)];
 this.activity = options.activity || (this.position.z < -30 ? 
-  (Math.random() < 0.6 ? 'sitting' : (Math.random() < 0.5 ? 'lying' : 'standing')) :
+  (Math.random() < 0.4 ? 'building' : (Math.random() < 0.5 ? 'sitting' : (Math.random() < 0.5 ? 'lying' : 'standing'))) :
   (Math.random() < 0.7 ? 'walking' : 'standing'));
 this.isMale = Math.random() > 0.5;
 this.isChild = this.bodyType.name === 'child';
 
+// Sandcastle building state
+this.buildingState = 0; // 0 = gathering, 1 = placing, 2 = patting
+this.buildingProgress = 0;
+this.mySandcastle = null;
+this.bucket = null;
+
 this.limbRefs = {};
-this.createHighPolyMesh();
+this.createMesh();
+
+// Create bucket for builders
+if (this.activity === 'building') {
+  this.createBucket();
+  this.createPersonalSandcastle();
+}
 }
 
-createHighPolyMesh() {
+createBucket() {
+const bucketGroup = new THREE.Group();
+const bucketMat = new THREE.MeshStandardMaterial({ color: [0xff6b6b, 0x4ecdc4, 0xf9ca24, 0x45b7d1][Math.floor(Math.random() * 4)], roughness: 0.5 });
+
+// Bucket body
+const bucketGeo = new THREE.CylinderGeometry(0.08, 0.06, 0.12, 12);
+const bucket = new THREE.Mesh(bucketGeo, bucketMat);
+bucket.castShadow = true;
+bucketGroup.add(bucket);
+
+// Handle
+const handleGeo = new THREE.TorusGeometry(0.05, 0.008, 8, 16, Math.PI);
+const handleMat = new THREE.MeshStandardMaterial({ color: 0x888888, metalness: 0.5 });
+const handle = new THREE.Mesh(handleGeo, handleMat);
+handle.position.y = 0.06;
+handle.rotation.x = Math.PI;
+bucketGroup.add(handle);
+
+// Sand in bucket
+const sandGeo = new THREE.CylinderGeometry(0.07, 0.07, 0.04, 12);
+const sandMat = new THREE.MeshStandardMaterial({ color: 0xd4b896, roughness: 0.95 });
+this.bucketSand = new THREE.Mesh(sandGeo, sandMat);
+this.bucketSand.position.y = 0.04;
+this.bucketSand.visible = false;
+bucketGroup.add(this.bucketSand);
+
+bucketGroup.position.set(0.35, 0, 0.2);
+this.bucket = bucketGroup;
+this.mesh.add(bucketGroup);
+}
+
+createPersonalSandcastle() {
+const castleGroup = new THREE.Group();
+const sandMat = new THREE.MeshStandardMaterial({ color: 0xd4b896, roughness: 0.95 });
+
+// Start with just a mound, grows as they build
+const moundGeo = new THREE.ConeGeometry(0.15, 0.1, 12);
+const mound = new THREE.Mesh(moundGeo, sandMat);
+mound.position.y = 0.05;
+mound.castShadow = true;
+castleGroup.add(mound);
+this.castleMound = mound;
+
+// Tower (hidden initially, appears as building progresses)
+const towerGeo = new THREE.CylinderGeometry(0.08, 0.1, 0.2, 10);
+const tower = new THREE.Mesh(towerGeo, sandMat);
+tower.position.y = 0.15;
+tower.scale.y = 0;
+tower.castShadow = true;
+castleGroup.add(tower);
+this.castleTower = tower;
+
+// Top
+const topGeo = new THREE.ConeGeometry(0.1, 0.1, 10);
+const top = new THREE.Mesh(topGeo, sandMat);
+top.position.y = 0.3;
+top.scale.y = 0;
+top.castShadow = true;
+castleGroup.add(top);
+this.castleTop = top;
+
+castleGroup.position.set(0.5, -0.6, 0.4);
+this.mySandcastle = castleGroup;
+scene.add(castleGroup);
+}
+
+createMesh() {
 const group = new THREE.Group();
 const bt = this.bodyType;
 const scale = this.isChild ? 0.6 : 1;
@@ -1595,8 +1732,8 @@ this.mesh = group;
 }
 
 applyPose(group) {
-if (this.activity === 'sitting') {
-  // Rotate legs forward for sitting
+if (this.activity === 'sitting' || this.activity === 'building') {
+  // Rotate legs forward for sitting/building (kneeling)
   if (this.limbRefs.thighL) this.limbRefs.thighL.rotation.x = -Math.PI / 2.2;
   if (this.limbRefs.thighR) this.limbRefs.thighR.rotation.x = -Math.PI / 2.2;
   if (this.limbRefs.calfL) {
@@ -1638,13 +1775,13 @@ if (this.activity === 'walking' && CONFIG.animatePeople) {
   this.position.x += this.velocity.x * deltaTime;
   this.position.z += this.velocity.z * deltaTime;
   
-  // Keep in bounds
+  // Keep in bounds - don't go into water
   if (Math.abs(this.position.x) > 70) {
     this.position.x = Math.sign(this.position.x) * 70;
     this.direction.x *= -1;
   }
-  if (this.position.z > 65 || this.position.z < -50) {
-    this.position.z = Math.max(-50, Math.min(65, this.position.z));
+  if (this.position.z > -18 || this.position.z < -55) {
+    this.position.z = Math.max(-55, Math.min(-18, this.position.z));
     this.direction.y *= -1;
   }
   
@@ -1654,9 +1791,83 @@ if (this.activity === 'walking' && CONFIG.animatePeople) {
   }
 }
 
+// Sandcastle building animation
+if (this.activity === 'building' && CONFIG.animatePeople) {
+  this.buildingProgress += deltaTime * 0.3;
+  const cycle = Math.sin(this.animPhase * 0.5);
+  
+  // Arm animation: reach down, scoop, lift, place
+  if (this.buildingState === 0) {
+    // Gathering sand - reach down
+    if (this.limbRefs.upperArmR) {
+      this.limbRefs.upperArmR.rotation.x = -0.8 + cycle * 0.3;
+      this.limbRefs.upperArmR.rotation.z = -0.5;
+    }
+    if (this.limbRefs.forearmR) {
+      this.limbRefs.forearmR.rotation.x = -0.5 + cycle * 0.2;
+    }
+    if (this.bucketSand) this.bucketSand.visible = false;
+    
+    if (this.buildingProgress > 2) {
+      this.buildingState = 1;
+      this.buildingProgress = 0;
+      if (this.bucketSand) this.bucketSand.visible = true;
+    }
+  } else if (this.buildingState === 1) {
+    // Lifting and placing - arms move up and forward
+    if (this.limbRefs.upperArmR) {
+      this.limbRefs.upperArmR.rotation.x = -0.3 + cycle * 0.2;
+      this.limbRefs.upperArmR.rotation.z = -0.3;
+    }
+    if (this.bucket) {
+      this.bucket.position.y = 0.1 + Math.abs(cycle) * 0.15;
+      this.bucket.position.z = 0.3 + Math.abs(cycle) * 0.1;
+    }
+    
+    if (this.buildingProgress > 2) {
+      this.buildingState = 2;
+      this.buildingProgress = 0;
+      // Grow the sandcastle
+      if (this.castleTower) {
+        this.castleTower.scale.y = Math.min(1, this.castleTower.scale.y + 0.25);
+      }
+      if (this.castleTop && this.castleTower && this.castleTower.scale.y >= 0.8) {
+        this.castleTop.scale.y = Math.min(1, this.castleTop.scale.y + 0.3);
+      }
+    }
+  } else {
+    // Patting/shaping - small arm movements
+    if (this.limbRefs.upperArmR) {
+      this.limbRefs.upperArmR.rotation.x = -0.5 + cycle * 0.15;
+    }
+    if (this.limbRefs.upperArmL) {
+      this.limbRefs.upperArmL.rotation.x = -0.5 - cycle * 0.15;
+    }
+    if (this.bucket) {
+      this.bucket.position.y = 0;
+      this.bucket.position.z = 0.2;
+    }
+    if (this.bucketSand) this.bucketSand.visible = false;
+    
+    if (this.buildingProgress > 1.5) {
+      this.buildingState = 0;
+      this.buildingProgress = 0;
+    }
+  }
+  
+  // Update sandcastle world position
+  if (this.mySandcastle) {
+    this.mySandcastle.position.set(
+      this.position.x + 0.5,
+      -0.55,
+      this.position.z + 0.4
+    );
+  }
+}
+
 // Update height based on location
 let baseY = 0;
-if (this.position.z < -25) {
+if (this.position.z < -15) {
   // On beach
   baseY = -0.5;
 } else {
@@ -1673,6 +1884,13 @@ this.mesh.position.copy(this.position);
 
 remove() {
 scene.remove(this.mesh);
+if (this.mySandcastle) {
+  scene.remove(this.mySandcastle);
+  this.mySandcastle.traverse(child => {
+    if (child.geometry) child.geometry.dispose();
+    if (child.material) child.material.dispose();
+  });
+}
 this.mesh.traverse(child => {
   if (child.geometry) child.geometry.dispose();
   if (child.material) child.material.dispose();
@@ -2165,6 +2383,269 @@ hideContextMenu();
 }
 
 // ==========================================
+// PHYSICS SANDBOX
+// ==========================================
+
+function updateObjectWeight(val) {
+CONFIG.objectWeight = parseFloat(val);
+document.getElementById('weightVal').textContent = val;
+}
+
+function updateObjectScale(val) {
+CONFIG.objectScale = parseFloat(val);
+document.getElementById('scaleVal').textContent = val;
+}
+
+function updateModelScale(val) {
+CONFIG.modelScale = parseFloat(val);
+document.getElementById('modelScaleVal').textContent = val;
+if (importedModel) {
+  importedModel.scale.setScalar(parseFloat(val));
+}
+}
+
+function updateModelWeight(val) {
+CONFIG.modelWeight = parseFloat(val);
+document.getElementById('modelWeightVal').textContent = val;
+}
+
+function dropBox() {
+const scale = CONFIG.objectScale;
+const weight = CONFIG.objectWeight;
+
+const boxGeo = new THREE.BoxGeometry(1 * scale, 1 * scale, 1 * scale);
+const boxMat = new THREE.MeshStandardMaterial({ 
+  color: Math.random() * 0xffffff,
+  roughness: 0.5,
+  metalness: 0.1
+});
+const box = new THREE.Mesh(boxGeo, boxMat);
+
+// Start above scene
+box.position.set(
+  (Math.random() - 0.5) * 40,
+  20 + Math.random() * 10,
+  (Math.random() - 0.5) * 40
+);
+box.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+box.castShadow = true;
+box.receiveShadow = true;
+
+// Physics data
+box.userData.velocity = new THREE.Vector3(0, 0, 0);
+box.userData.angularVelocity = new THREE.Vector3(
+  (Math.random() - 0.5) * 2,
+  (Math.random() - 0.5) * 2,
+  (Math.random() - 0.5) * 2
+);
+box.userData.weight = weight;
+box.userData.type = 'box';
+
+scene.add(box);
+physicsObjects.push(box);
+showNotification('📦 Box dropped!');
+}
+
+function dropSphere() {
+const scale = CONFIG.objectScale;
+const weight = CONFIG.objectWeight;
+
+const sphereGeo = new THREE.SphereGeometry(0.5 * scale, 16, 12);
+const sphereMat = new THREE.MeshStandardMaterial({ 
+  color: Math.random() * 0xffffff,
+  roughness: 0.3,
+  metalness: 0.2
+});
+const sphere = new THREE.Mesh(sphereGeo, sphereMat);
+
+sphere.position.set(
+  (Math.random() - 0.5) * 40,
+  20 + Math.random() * 10,
+  (Math.random() - 0.5) * 40
+);
+sphere.castShadow = true;
+sphere.receiveShadow = true;
+
+sphere.userData.velocity = new THREE.Vector3(0, 0, 0);
+sphere.userData.angularVelocity = new THREE.Vector3(
+  (Math.random() - 0.5) * 3,
+  (Math.random() - 0.5) * 3,
+  (Math.random() - 0.5) * 3
+);
+sphere.userData.weight = weight;
+sphere.userData.type = 'sphere';
+
+scene.add(sphere);
+physicsObjects.push(sphere);
+showNotification('⚽ Sphere dropped!');
+}
+
+function clearPhysicsObjects() {
+physicsObjects.forEach(obj => {
+  scene.remove(obj);
+  if (obj.geometry) obj.geometry.dispose();
+  if (obj.material) obj.material.dispose();
+});
+physicsObjects = [];
+showNotification('🗑️ Objects cleared!');
+}
+
+function updatePhysicsObjects(deltaTime) {
+const gravity = -9.8;
+const groundLevel = -0.5; // Beach level
+const waterLevel = 0;
+const damping = 0.98;
+const bounceFactor = 0.5;
+
+physicsObjects.forEach(obj => {
+  const v = obj.userData.velocity;
+  const w = obj.userData.weight || 1;
+  const av = obj.userData.angularVelocity;
+  
+  // Apply gravity (heavier = faster fall)
+  v.y += gravity * w * deltaTime;
+  
+  // Update position
+  obj.position.add(v.clone().multiplyScalar(deltaTime));
+  
+  // Update rotation
+  obj.rotation.x += av.x * deltaTime;
+  obj.rotation.y += av.y * deltaTime;
+  obj.rotation.z += av.z * deltaTime;
+  
+  // Ground collision
+  const objRadius = obj.userData.type === 'sphere' ? 0.5 * CONFIG.objectScale : 0.5 * CONFIG.objectScale;
+  
+  // Check if in water or on beach
+  let floorLevel = groundLevel;
+  if (obj.position.z > -15) {
+    // In water area - bob on waves
+    const waveH = ocean ? ocean.getHeightAt(obj.position.x, obj.position.z) : 0;
+    floorLevel = waveH - objRadius * 0.3;
+    
+    // Water drag
+    if (obj.position.y < waveH + objRadius) {
+      v.multiplyScalar(0.95);
+      av.multiplyScalar(0.95);
+      // Buoyancy (lighter objects float more)
+      v.y += (1 / w) * 3 * deltaTime;
+    }
+  }
+  
+  if (obj.position.y - objRadius < floorLevel) {
+    obj.position.y = floorLevel + objRadius;
+    v.y *= -bounceFactor;
+    v.x *= damping;
+    v.z *= damping;
+    av.multiplyScalar(0.8);
+  }
+  
+  // Keep in bounds
+  if (Math.abs(obj.position.x) > 80) {
+    obj.position.x = Math.sign(obj.position.x) * 80;
+    v.x *= -0.5;
+  }
+  if (obj.position.z > 80 || obj.position.z < -60) {
+    obj.position.z = Math.max(-60, Math.min(80, obj.position.z));
+    v.z *= -0.5;
+  }
+});
+}
+
+// 3D Model Import
+function handleModelImport(event) {
+const file = event.target.files[0];
+if (!file) return;
+
+const filename = file.name.toLowerCase();
+const url = URL.createObjectURL(file);
+
+if (filename.endsWith('.glb') || filename.endsWith('.gltf')) {
+  if (!gltfLoader) gltfLoader = new THREE.GLTFLoader();
+  
+  gltfLoader.load(url, (gltf) => {
+    if (importedModel) {
+      scene.remove(importedModel);
+    }
+    importedModel = gltf.scene;
+    importedModel.scale.setScalar(CONFIG.modelScale);
+    importedModel.position.set(0, 5, -30);
+    importedModel.traverse(child => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+      }
+    });
+    scene.add(importedModel);
+    document.getElementById('importedModelControls').style.display = 'block';
+    showNotification('📂 Model loaded: ' + file.name);
+    URL.revokeObjectURL(url);
+  }, undefined, (error) => {
+    console.error('Error loading GLTF:', error);
+    showNotification('❌ Failed to load model');
+  });
+} else if (filename.endsWith('.obj')) {
+  if (!objLoader) objLoader = new THREE.OBJLoader();
+  
+  objLoader.load(url, (obj) => {
+    if (importedModel) {
+      scene.remove(importedModel);
+    }
+    importedModel = obj;
+    importedModel.scale.setScalar(CONFIG.modelScale);
+    importedModel.position.set(0, 5, -30);
+    importedModel.traverse(child => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+        if (!child.material.color) {
+          child.material = new THREE.MeshStandardMaterial({ color: 0x888888 });
+        }
+      }
+    });
+    scene.add(importedModel);
+    document.getElementById('importedModelControls').style.display = 'block';
+    showNotification('📂 Model loaded: ' + file.name);
+    URL.revokeObjectURL(url);
+  }, undefined, (error) => {
+    console.error('Error loading OBJ:', error);
+    showNotification('❌ Failed to load model');
+  });
+} else {
+  showNotification('❌ Unsupported format. Use GLB, GLTF, or OBJ');
+}
+}
+
+function dropImportedModel() {
+if (!importedModel) {
+  showNotification('❌ No model loaded');
+  return;
+}
+
+// Clone the model
+const clone = importedModel.clone();
+clone.position.set(
+  (Math.random() - 0.5) * 40,
+  20 + Math.random() * 10,
+  (Math.random() - 0.5) * 40
+);
+clone.scale.setScalar(CONFIG.modelScale);
+
+clone.userData.velocity = new THREE.Vector3(0, 0, 0);
+clone.userData.angularVelocity = new THREE.Vector3(
+  (Math.random() - 0.5) * 2,
+  (Math.random() - 0.5) * 2,
+  (Math.random() - 0.5) * 2
+);
+clone.userData.weight = CONFIG.modelWeight;
+clone.userData.type = 'model';
+
+scene.add(clone);
+physicsObjects.push(clone);
+showNotification('📥 Model dropped!');
+}
+
+// ==========================================
 // CONTEXT MENU
 // ==========================================
 
@@ -2231,6 +2712,7 @@ people.forEach(person => person.update(deltaTime));
 if (particleSystem) particleSystem.update(deltaTime);
 if (birdsSystem) birdsSystem.update(deltaTime);
 updateBeachBalls(deltaTime);
+updatePhysicsObjects(deltaTime);
 
 updateTimeOfDayLighting();
 
@@ -2253,11 +2735,11 @@ const LOADING_TIPS = [
 'Try the Sunset preset for golden hour lighting.',
 'Right-click anywhere to add people or create waves.',
 'Use the Time of Day slider to experience dawn, noon, and dusk.',
-'Circle Particle mode shows 6400+ animated water droplets.',
-'Watch the foam line move with the waves near the shore.',
-'People have 500+ polygons with realistic proportions.',
-'Beach towels, umbrellas, and sandcastles dot the shoreline.',
-'Birds fly overhead in realistic patterns.'
+'Drop boxes and spheres from the Physics Sandbox!',
+'Watch people build sandcastles on the beach.',
+'Import your own 3D models (GLB/OBJ) and drop them!',
+'Adjust object weight - heavy objects sink, light ones float.',
+'Birds fly overhead in patterns.'
 ];
 
 function init() {

@@ -1,77 +1,61 @@
 # OceanLife Pro v4.0
 
-Hyperrealistic beach simulation built with Three.js featuring high-polygon models, dynamic lighting, and immersive ocean physics.
+Interactive beach simulation with physics sandbox. Built with Three.js.
 
 ## Features
 
-### Hyperrealistic Water
-- **Mesh Mode**: 180×180 segment water mesh with 8-octave wave simulation
-- **Circle Particle Mode**: 6,400 animated circular water droplets
-- **Shore Foam**: 2,000 particle foam system that moves with the waves
-- **Dynamic Colors**: Water color changes based on depth and wave height
+### Water System
+- **Mesh Mode**: Animated wave mesh with foam at shoreline
+- **Circle Particle Mode**: 4,400 animated circular water droplets
+- **Shore Foam**: Foam particles that move with the waves
+- Water stays in the ocean area - doesn't overflow onto beach
 
-### High-Poly People (500+ polygons each)
-- Detailed body parts: torso, head, arms, hands, legs, feet
-- Facial features: eyes, nose, mouth, ears
-- 4 hair styles: short, long, curly/afro, bald
-- 8 realistic skin tones
-- 5 body types: athletic, average, slim, stocky, child
-- Male and female swimwear variations
-
-### Activities & Poses
-- Walking (with limb animation)
-- Standing
-- Sitting (on beach)
-- Lying (sunbathing)
+### People
+- Multiple body types and skin tones
+- Activities: walking, standing, sitting, lying, **building sandcastles**
+- Sandcastle builders animate: gather sand → fill bucket → place sand → sandcastle grows
 
 ### Beach Scene
-- Realistic sand with dune variations
-- Wet sand near waterline
-- 8 palm trees with coconuts
-- 12 beach towels (varied colors)
-- 8 beach umbrellas
-- 5 sandcastles with towers
-- 6 animated beach balls
-- Rocks scattered on shore
+- Beach towels, umbrellas, sandcastles
+- Animated beach balls
+- Palm trees with coconuts
+- Rocks on the shore
+
+### Physics Sandbox
+- **Drop Box**: Drop random colored boxes into the scene
+- **Drop Sphere**: Drop spheres that bounce and roll
+- **Object Weight**: Heavier objects fall faster, lighter objects float
+- **Object Scale**: Adjust size of dropped objects
+- **Clear Objects**: Remove all physics objects
+
+### 3D Model Import
+- **Import GLB/GLTF**: Load your own 3D models
+- **Import OBJ**: Load OBJ files
+- **Model Scale**: Adjust imported model size
+- **Model Weight**: Adjust physics weight
+- **Drop Model**: Drop copies of your imported model with physics
 
 ### Environment
 - Dynamic time of day (24-hour cycle)
-- Sun position follows time
-- Sky/ambient/fog colors shift realistically
-- Night mode with stars
-- 5 flying birds with wing animation
-- 4K shadow maps
+- Sun position and sky colors change
+- Presets: Morning, Noon, Sunset, Storm
+- Flying birds
 
-### Controls
-- Orbit: drag to rotate view
-- Zoom: scroll or pinch
-- Right-click: context menu (add person, create wave, spawn beach ball)
-- Control panel: adjust waves, people count, time of day, presets
+## Controls
+
+- **Orbit**: Drag to rotate view
+- **Zoom**: Scroll or pinch
+- **Right-click**: Context menu
 
 ## Run
 
-Open `index.html` in a modern browser (Chrome, Firefox, Safari, Edge).
+Open `index.html` in a browser, or serve locally:
 
-Or serve locally:
 ```bash
 python3 -m http.server 3000
 # Open http://localhost:3000
 ```
 
-## Performance Modes
-
-- **Ultra (Mesh)**: Best visuals, 180×180 water segments, foam particles
-- **Particle Physics**: 6,400 circular water droplets, lighter on GPU
-- **Hybrid**: Mix of both modes
-
 ## Browser Support
 
-Requires WebGL 2.0. Works best in:
-- Chrome 90+
-- Firefox 88+
-- Safari 15+
-- Edge 90+
-
-## License
-
-MIT License - Use freely for personal and commercial projects.
+Requires WebGL. Works in Chrome, Firefox, Safari, Edge.
