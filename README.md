@@ -1,61 +1,59 @@
-# OceanLife Pro v4.0
+# OceanLife Pro v1.0
 
-Interactive beach simulation with physics sandbox. Built with Three.js.
+Interactive beach simulation with physics sandbox. Built with Three.js by Mainline Studios.
 
 ## Features
 
 ### Water System
 - **Mesh Mode**: Animated wave mesh with foam at shoreline
-- **Circle Particle Mode**: 4,400 animated circular water droplets
-- **Shore Foam**: Foam particles that move with the waves
-- Water stays in the ocean area - doesn't overflow onto beach
+- **Circle Particle Mode**: Animated circular water droplets
+- Water reacts to objects and people with ripples
 
-### People
-- Multiple body types and skin tones
-- Activities: walking, standing, sitting, lying, **building sandcastles**
-- Sandcastle builders animate: gather sand → fill bucket → place sand → sandcastle grows
-
-### Beach Scene
-- Beach towels, umbrellas, sandcastles
-- Animated beach balls
-- Palm trees with coconuts
-- Rocks on the shore
+### People (50+ Animations)
+- Walking, running, jogging, skipping
+- Swimming, splashing, wading
+- Building sandcastles, digging sand
+- Sunbathing, relaxing, meditating
+- Dancing, stretching, yoga poses
+- Automatic activity changes every 3-15 seconds
+- Always-alive idle animations (breathing, swaying)
 
 ### Physics Sandbox
-- **Drop Box**: Drop random colored boxes into the scene
-- **Drop Sphere**: Drop spheres that bounce and roll
-- **Object Weight**: Heavier objects fall faster, lighter objects float
-- **Object Scale**: Adjust size of dropped objects
-- **Clear Objects**: Remove all physics objects
+- Drop boxes and spheres with adjustable weight/scale
+- Heavy objects sink, light objects float
+- Objects create splashes and ripples based on weight
+- Import your own 3D models (GLB/OBJ)
 
-### 3D Model Import
-- **Import GLB/GLTF**: Load your own 3D models
-- **Import OBJ**: Load OBJ files
-- **Model Scale**: Adjust imported model size
-- **Model Weight**: Adjust physics weight
-- **Drop Model**: Drop copies of your imported model with physics
+### Controls
+| Key | Action |
+|-----|--------|
+| W / ↑ | Move forward |
+| S / ↓ | Move backward |
+| A / ← | Strafe left |
+| D / → | Strafe right |
+| Q / Space | Move up |
+| E / Shift | Move down |
+| Mouse drag | Orbit camera |
+| Scroll | Zoom |
+| Right-click | Context menu |
 
 ### Environment
 - Dynamic time of day (24-hour cycle)
-- Sun position and sky colors change
 - Presets: Morning, Noon, Sunset, Storm
 - Flying birds
 
-## Controls
-
-- **Orbit**: Drag to rotate view
-- **Zoom**: Scroll or pinch
-- **Right-click**: Context menu
-
 ## Run
-
-Open `index.html` in a browser, or serve locally:
 
 ```bash
 python3 -m http.server 3000
 # Open http://localhost:3000
 ```
 
-## Browser Support
+## Loading Screen
+The app shows a Mainline Studios splash, then loads all assets with real progress indication before starting.
 
+## Browser Support
 Requires WebGL. Works in Chrome, Firefox, Safari, Edge.
+
+---
+*Made by Mainline Studios*
