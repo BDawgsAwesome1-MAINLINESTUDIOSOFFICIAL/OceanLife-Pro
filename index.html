@@ -42,6 +42,83 @@ color: white;
 -webkit-font-smoothing: antialiased;
 }
 
+/* Mainline Studios Splash Screen */
+#splash-screen {
+position: fixed;
+top: 0;
+left: 0;
+width: 100%;
+height: 100%;
+background: linear-gradient(135deg, #0a1628 0%, #1a2d4a 100%);
+display: flex;
+flex-direction: column;
+justify-content: center;
+align-items: center;
+z-index: 10001;
+opacity: 0;
+}
+
+#splash-screen.fade-in {
+animation: splashFadeIn 1.5s ease forwards;
+}
+
+#splash-screen.fade-out {
+animation: splashFadeOut 1s ease forwards;
+}
+
+@keyframes splashFadeIn {
+0% { opacity: 0; }
+100% { opacity: 1; }
+}
+
+@keyframes splashFadeOut {
+0% { opacity: 1; }
+100% { opacity: 0; pointer-events: none; }
+}
+
+.splash-logo {
+margin-bottom: 30px;
+opacity: 0;
+transform: scale(0.8);
+animation: logoReveal 1s ease 0.5s forwards;
+}
+
+@keyframes logoReveal {
+0% { opacity: 0; transform: scale(0.8); }
+100% { opacity: 1; transform: scale(1); }
+}
+
+.splash-title {
+font-size: 42px;
+font-weight: 700;
+color: #ffffff;
+letter-spacing: 8px;
+text-transform: uppercase;
+opacity: 0;
+transform: translateY(20px);
+animation: titleReveal 1s ease 1s forwards;
+text-shadow: 0 4px 20px rgba(43, 108, 176, 0.5);
+}
+
+@keyframes titleReveal {
+0% { opacity: 0; transform: translateY(20px); }
+100% { opacity: 1; transform: translateY(0); }
+}
+
+.splash-subtitle {
+font-size: 14px;
+color: rgba(255, 255, 255, 0.6);
+letter-spacing: 4px;
+margin-top: 15px;
+opacity: 0;
+animation: subtitleReveal 0.8s ease 1.5s forwards;
+}
+
+@keyframes subtitleReveal {
+0% { opacity: 0; }
+100% { opacity: 1; }
+}
+
 /* Loading Screen */
 #loading-screen {
 position: fixed;
@@ -478,6 +555,18 @@ margin: 8px 12px;
 </head>
 <body>
 
+<!-- Mainline Studios Splash Screen -->
+<div id="splash-screen">
+<div class="splash-logo">
+  <svg width="120" height="120" viewBox="0 0 100 100">
+    <rect x="10" y="10" width="80" height="80" rx="10" fill="none" stroke="#2b6cb0" stroke-width="3"/>
+    <rect x="25" y="25" width="50" height="50" rx="5" fill="#2b6cb0"/>
+  </svg>
+</div>
+<div class="splash-title">MAINLINE STUDIOS</div>
+<div class="splash-subtitle">PRESENTS</div>
+</div>
+
 <!-- Loading Screen -->
 <div id="loading-screen">
 <div class="loader-container">
@@ -900,6 +989,9 @@ this.points.renderOrder = 1;
 scene.add(this.points);
 this.positionArray = positions;
 this.colorArray = colors;
+
+// Disturbance system for realistic water reactions
+this.disturbances = [];
 console.log(`Created ${total} circle water particles ✓`);
 }
 
@@ -924,12 +1016,34 @@ const col = this.colorArray;
 const gsX = this.gridSizeX;
 const gsZ = this.gridSizeZ;
 
+// Update disturbances
+for (let i = this.disturbances.length - 1; i >= 0; i--) {
+  this.disturbances[i].life -= deltaTime;
+  if (this.disturbances[i].life <= 0) {
+    this.disturbances.splice(i, 1);
+  }
+}
+
 for (let gz = 0; gz < gsZ; gz++) {
   for (let gx = 0; gx < gsX; gx++) {
     const idx = (gz * gsX + gx);
     const x = pos[idx * 3];
     const z = pos[idx * 3 + 2];
-    const h = this.waveHeight(x, z, t);
+    let h = this.waveHeight(x, z, t);
+    
+    // Apply disturbances from people/objects
+    for (const d of this.disturbances) {
+      const dx = x - d.x;
+      const dz = z - d.z;
+      const dist = Math.sqrt(dx * dx + dz * dz);
+      if (dist < d.radius) {
+        const falloff = 1 - dist / d.radius;
+        const lifeRatio = d.life / d.maxLife;
+        const ripple = Math.sin(dist * 3 - t * 8) * d.strength * falloff * lifeRatio;
+        h += ripple;
+      }
+    }
+    
     pos[idx * 3 + 1] = h;
     
     // Dynamic color based on wave height
@@ -948,7 +1062,15 @@ return this.waveHeight(x, z, this.time);
 }
 
 disturb(x, z, strength) {
-// Visual only - wave formula handles motion
+// Add a disturbance that will affect nearby particles
+this.disturbances.push({
+  x: x,
+  z: z,
+  strength: strength,
+  radius: 3 + strength * 2,
+  life: 1.5, // seconds
+  maxLife: 1.5
+});
 }
 
 remove() {
@@ -1015,6 +1137,9 @@ material.vertexColors = true;
 
 // Shore foam particles
 this.createShoreFoam();
+
+// Disturbance system for realistic water reactions
+this.disturbances = [];
 
 console.log('Mesh water created ✓');
 }
@@ -1100,11 +1225,33 @@ const positions = this.mesh.geometry.attributes.position.array;
 const colors = this.colorArray;
 const t = this.time;
 
+// Update disturbances
+for (let i = this.disturbances.length - 1; i >= 0; i--) {
+  this.disturbances[i].life -= deltaTime;
+  if (this.disturbances[i].life <= 0) {
+    this.disturbances.splice(i, 1);
+  }
+}
+
 for (let i = 0; i < positions.length / 3; i++) {
   const idx = i * 3;
   const x = this.originalPositions[idx];
   const z = this.originalPositions[idx + 2];
-  const h = this.waveHeight(x, z, t);
+  let h = this.waveHeight(x, z, t);
+  
+  // Apply disturbances from people/objects
+  for (const d of this.disturbances) {
+    const dx = x - d.x;
+    const dz = z - d.z;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+    if (dist < d.radius) {
+      const falloff = 1 - dist / d.radius;
+      const lifeRatio = d.life / d.maxLife;
+      const ripple = Math.sin(dist * 3 - t * 8) * d.strength * falloff * lifeRatio;
+      h += ripple;
+    }
+  }
+  
   positions[idx + 1] = h;
   
   // Dynamic water color based on depth and wave height
@@ -1154,7 +1301,15 @@ return this.waveHeight(x, z, this.time);
 }
 
 disturb(x, z, strength) {
-// Visual feedback only for mesh mode
+// Add a disturbance that will affect nearby vertices
+this.disturbances.push({
+  x: x,
+  z: z,
+  strength: strength,
+  radius: 4 + strength * 3,
+  life: 2,
+  maxLife: 2
+});
 }
 
 remove() {
@@ -1343,8 +1498,32 @@ const BODY_TYPES = [
 { name: 'child', torsoScale: [0.7, 0.7, 0.7], shoulderWidth: 0.7 }
 ];
 
-// Activity types
-const ACTIVITY_TYPES = ['walking', 'standing', 'sitting', 'lying', 'building'];
+// 50+ Activity/Animation types
+const ACTIVITY_TYPES = {
+// Beach activities (on sand)
+beach: [
+  'standing', 'sitting', 'lying_back', 'lying_front', 'lying_side',
+  'building_sandcastle', 'digging_sand', 'burying_friend', 'making_sand_angel',
+  'sunbathing', 'reading_book', 'applying_sunscreen', 'stretching',
+  'playing_frisbee', 'playing_volleyball', 'doing_pushups', 'doing_situps',
+  'yoga_pose', 'meditating', 'taking_photo', 'waving', 'pointing',
+  'walking_slow', 'walking_fast', 'jogging', 'running', 'sprinting',
+  'jumping', 'hopping', 'skipping', 'dancing', 'hula_dance',
+  'talking', 'laughing', 'eating', 'drinking', 'picking_shells',
+  'building_moat', 'drawing_in_sand', 'kicking_sand', 'collecting_water'
+],
+// Water activities
+water: [
+  'wading', 'swimming', 'floating', 'treading_water', 'splashing',
+  'diving', 'jumping_waves', 'bodyboarding', 'snorkeling',
+  'playing_in_waves', 'ducking_under', 'standing_in_water', 'walking_in_water',
+  'swimming_backstroke', 'swimming_breaststroke', 'doggy_paddle'
+]
+};
+
+// Flat list for easy random selection
+const ALL_BEACH_ACTIVITIES = ACTIVITY_TYPES.beach;
+const ALL_WATER_ACTIVITIES = ACTIVITY_TYPES.water;
 
 class HighPolyPerson {
 constructor(position, options = {}) {
@@ -1356,14 +1535,27 @@ this.time = Math.random() * 10;
 this.changeTimer = 0;
 this.animPhase = Math.random() * Math.PI * 2;
 
+// Animation transition system
+this.activityTimer = 0;
+this.activityDuration = 5 + Math.random() * 55; // 5-60 seconds
+this.transitionProgress = 0;
+this.isTransitioning = false;
+this.previousActivity = null;
+
 // Random characteristics
 this.skinTone = options.skinTone || SKIN_TONES[Math.floor(Math.random() * SKIN_TONES.length)];
 this.hairColor = options.hairColor || HAIR_COLORS[Math.floor(Math.random() * HAIR_COLORS.length)];
 this.swimColor = options.swimColor || SWIMWEAR_COLORS[Math.floor(Math.random() * SWIMWEAR_COLORS.length)];
 this.bodyType = options.bodyType || BODY_TYPES[Math.floor(Math.random() * BODY_TYPES.length)];
-this.activity = options.activity || (this.position.z < -30 ? 
-  (Math.random() < 0.4 ? 'building' : (Math.random() < 0.5 ? 'sitting' : (Math.random() < 0.5 ? 'lying' : 'standing'))) :
-  (Math.random() < 0.7 ? 'walking' : 'standing'));
+// Assign activity based on location
+if (this.position.z < -20) {
+  // On beach
+  this.activity = options.activity || ALL_BEACH_ACTIVITIES[Math.floor(Math.random() * ALL_BEACH_ACTIVITIES.length)];
+} else {
+  // In water
+  this.activity = options.activity || ALL_WATER_ACTIVITIES[Math.floor(Math.random() * ALL_WATER_ACTIVITIES.length)];
+}
+
 this.isMale = Math.random() > 0.5;
 this.isChild = this.bodyType.name === 'child';
 
@@ -1373,11 +1565,15 @@ this.buildingProgress = 0;
 this.mySandcastle = null;
 this.bucket = null;
 
+// Props
+this.hasBook = false;
+this.hasFrisbee = false;
+
 this.limbRefs = {};
 this.createMesh();
 
-// Create bucket for builders
-if (this.activity === 'building') {
+// Create bucket for sand activities
+if (this.activity.includes('building') || this.activity.includes('digging') || this.activity.includes('collecting')) {
   this.createBucket();
   this.createPersonalSandcastle();
 }
@@ -1731,58 +1927,221 @@ scene.add(group);
 this.mesh = group;
 }
 
+// Get pose data for activity
+getPoseForActivity(activity) {
+const poses = {
+  // Standing poses
+  standing: { body: 0, armL: 0, armR: 0, legL: 0, legR: 0 },
+  waving: { body: 0, armL: 0, armR: -1.5, legL: 0, legR: 0 },
+  pointing: { body: 0, armL: 0, armR: -0.8, legL: 0, legR: 0 },
+  talking: { body: 0, armL: 0.2, armR: 0.3, legL: 0, legR: 0 },
+  laughing: { body: 0.1, armL: 0.3, armR: 0.3, legL: 0, legR: 0 },
+  
+  // Sitting poses
+  sitting: { body: 0, armL: 0, armR: 0, legL: -1.5, legR: -1.5, kneeBend: 1.2, lower: 0.3 },
+  meditating: { body: 0, armL: 0.5, armR: 0.5, legL: -1.5, legR: -1.5, kneeBend: 1.2, lower: 0.3 },
+  sunbathing: { body: 0, armL: -0.3, armR: -0.3, legL: -1.5, legR: -1.5, kneeBend: 1.2, lower: 0.3 },
+  reading_book: { body: 0.2, armL: -0.7, armR: -0.7, legL: -1.5, legR: -1.5, kneeBend: 1.2, lower: 0.3 },
+  eating: { body: 0.15, armL: -0.8, armR: -0.8, legL: -1.5, legR: -1.5, kneeBend: 1.2, lower: 0.3 },
+  drinking: { body: 0, armL: 0, armR: -1.2, legL: -1.5, legR: -1.5, kneeBend: 1.2, lower: 0.3 },
+  taking_photo: { body: 0, armL: -0.7, armR: -0.7, legL: 0, legR: 0 },
+  
+  // Lying poses  
+  lying_back: { bodyRotX: -1.5, lower: 0.5 },
+  lying_front: { bodyRotX: 1.5, lower: 0.5 },
+  lying_side: { bodyRotX: -1.5, bodyRotZ: 1.5, lower: 0.5 },
+  making_sand_angel: { bodyRotX: -1.5, armL: -1.2, armR: -1.2, lower: 0.5 },
+  
+  // Kneeling/building poses
+  building_sandcastle: { body: 0.3, armL: -0.6, armR: -0.6, legL: -1.5, legR: -1.5, kneeBend: 1.2, lower: 0.35 },
+  digging_sand: { body: 0.5, armL: -0.8, armR: -0.8, legL: -1.5, legR: -1.5, kneeBend: 1.2, lower: 0.35 },
+  burying_friend: { body: 0.4, armL: -0.7, armR: -0.7, legL: -1.5, legR: -1.5, kneeBend: 1.2, lower: 0.35 },
+  picking_shells: { body: 0.6, armL: -0.9, armR: -0.9, legL: -0.3, legR: -0.3, lower: 0.2 },
+  building_moat: { body: 0.5, armL: -0.7, armR: -0.7, legL: -1.5, legR: -1.5, kneeBend: 1.2, lower: 0.35 },
+  drawing_in_sand: { body: 0.4, armL: 0, armR: -0.9, legL: -1.2, legR: -1.2, kneeBend: 1.0, lower: 0.3 },
+  collecting_water: { body: 0.3, armL: -0.5, armR: -0.5, legL: 0, legR: 0 },
+  applying_sunscreen: { body: 0, armL: -0.6, armR: -0.6, legL: 0, legR: 0 },
+  
+  // Exercise poses
+  stretching: { body: -0.2, armL: -2.5, armR: -2.5, legL: 0, legR: 0 },
+  yoga_pose: { body: 0, armL: -2.5, armR: -2.5, legL: 0, legR: 0.8 },
+  doing_pushups: { bodyRotX: 1.4, armL: -0.8, armR: -0.8, lower: 0.5 },
+  doing_situps: { bodyRotX: -0.8, armL: 0.5, armR: 0.5, legL: -0.8, legR: -0.8, lower: 0.4 },
+  
+  // Play poses
+  playing_frisbee: { body: 0, armL: 0, armR: -1.2, legL: 0.2, legR: -0.2 },
+  playing_volleyball: { body: 0, armL: -1.5, armR: -1.5, legL: 0.1, legR: -0.1 },
+  kicking_sand: { body: 0, armL: 0.2, armR: 0.2, legL: 0, legR: 0.8 },
+  
+  // Water poses
+  wading: { body: 0, armL: 0.2, armR: 0.2, legL: 0.2, legR: -0.2 },
+  standing_in_water: { body: 0, armL: 0.3, armR: 0.3, legL: 0, legR: 0 },
+  walking_in_water: { body: 0, armL: 0.2, armR: 0.2, legL: 0.3, legR: -0.3 },
+  splashing: { body: 0.1, armL: -0.8, armR: -0.8, legL: 0.2, legR: 0.2 },
+  swimming: { bodyRotX: 1.3, armL: -1.2, armR: 0.5, legL: 0.3, legR: -0.3, lower: 0.3 },
+  swimming_backstroke: { bodyRotX: -1.3, armL: 0.5, armR: -1.2, legL: 0.3, legR: -0.3, lower: 0.3 },
+  swimming_breaststroke: { bodyRotX: 1.2, armL: -0.8, armR: -0.8, legL: 0.5, legR: 0.5, lower: 0.3 },
+  doggy_paddle: { bodyRotX: 1.0, armL: -0.6, armR: -0.6, legL: 0.2, legR: -0.2, lower: 0.4 },
+  floating: { bodyRotX: -1.4, armL: -0.5, armR: -0.5, legL: 0.2, legR: 0.2, lower: 0.2 },
+  treading_water: { body: 0, armL: -0.6, armR: -0.6, legL: 0.4, legR: -0.4 },
+  diving: { bodyRotX: 1.5, armL: -2.5, armR: -2.5, legL: 0, legR: 0, lower: 0.5 },
+  jumping_waves: { body: 0, armL: -0.5, armR: -0.5, legL: 0, legR: 0 },
+  playing_in_waves: { body: 0.1, armL: -0.4, armR: -0.4, legL: 0.2, legR: -0.2 },
+  ducking_under: { body: 0.8, armL: 0, armR: 0, legL: -0.5, legR: -0.5, lower: 0.4 },
+  bodyboarding: { bodyRotX: 1.2, armL: -0.3, armR: -0.3, legL: 0.2, legR: 0.2, lower: 0.4 },
+  snorkeling: { bodyRotX: 1.4, armL: 0.3, armR: 0.3, legL: 0.2, legR: -0.2, lower: 0.3 },
+  
+  // Dance/movement poses
+  dancing: { body: 0.1, armL: -1.0, armR: -1.0, legL: 0.2, legR: -0.2 },
+  hula_dance: { body: 0.1, armL: -0.8, armR: -0.6, legL: 0.15, legR: -0.15 },
+  jumping: { body: 0, armL: -1.2, armR: -1.2, legL: 0, legR: 0 },
+  hopping: { body: 0, armL: 0.3, armR: 0.3, legL: 0.5, legR: 0.5 },
+  skipping: { body: 0, armL: 0.4, armR: -0.4, legL: 0.6, legR: -0.3 }
+};
+
+return poses[activity] || poses.standing;
+}
+
 applyPose(group) {
-if (this.activity === 'sitting' || this.activity === 'building') {
-  // Rotate legs forward for sitting/building (kneeling)
-  if (this.limbRefs.thighL) this.limbRefs.thighL.rotation.x = -Math.PI / 2.2;
-  if (this.limbRefs.thighR) this.limbRefs.thighR.rotation.x = -Math.PI / 2.2;
+const pose = this.getPoseForActivity(this.activity);
+
+// Apply body rotation
+if (pose.bodyRotX) group.rotation.x = pose.bodyRotX;
+if (pose.bodyRotZ) group.rotation.z = pose.bodyRotZ;
+
+// Lower body for sitting/lying
+if (pose.lower) group.position.y -= pose.lower;
+
+// Apply leg poses
+if (pose.legL !== undefined && this.limbRefs.thighL) {
+  this.limbRefs.thighL.rotation.x = pose.legL;
+}
+if (pose.legR !== undefined && this.limbRefs.thighR) {
+  this.limbRefs.thighR.rotation.x = pose.legR;
+}
+
+// Knee bend for sitting
+if (pose.kneeBend) {
   if (this.limbRefs.calfL) {
-    this.limbRefs.calfL.rotation.x = Math.PI / 2.5;
+    this.limbRefs.calfL.rotation.x = pose.kneeBend;
     this.limbRefs.calfL.position.y = -0.32;
     this.limbRefs.calfL.position.z = 0.25;
   }
   if (this.limbRefs.calfR) {
-    this.limbRefs.calfR.rotation.x = Math.PI / 2.5;
+    this.limbRefs.calfR.rotation.x = pose.kneeBend;
     this.limbRefs.calfR.position.y = -0.32;
     this.limbRefs.calfR.position.z = 0.25;
   }
-  group.position.y -= 0.3;
-} else if (this.activity === 'lying') {
-  group.rotation.x = -Math.PI / 2.2;
-  group.position.y = -0.5;
+}
+
+// Apply arm poses
+if (pose.armL !== undefined && this.limbRefs.upperArmL) {
+  this.limbRefs.upperArmL.rotation.x = pose.armL;
+}
+if (pose.armR !== undefined && this.limbRefs.upperArmR) {
+  this.limbRefs.upperArmR.rotation.x = pose.armR;
+}
+}
+
+// Change to a new random activity
+changeActivity() {
+this.previousActivity = this.activity;
+
+// Pick new activity based on location
+const inWater = this.position.z > -18;
+const activityList = inWater ? ALL_WATER_ACTIVITIES : ALL_BEACH_ACTIVITIES;
+
+// Pick a different activity
+let newActivity;
+do {
+  newActivity = activityList[Math.floor(Math.random() * activityList.length)];
+} while (newActivity === this.activity && activityList.length > 1);
+
+this.activity = newActivity;
+this.activityDuration = 5 + Math.random() * 55; // 5-60 seconds
+this.activityTimer = 0;
+this.buildingState = 0;
+this.buildingProgress = 0;
+
+// Reset pose
+this.mesh.rotation.set(0, this.mesh.rotation.y, 0);
+this.mesh.position.y = this.position.y;
+
+// Re-apply new pose
+this.applyPose(this.mesh);
+
+// Create bucket if needed for new activity
+if ((this.activity.includes('building') || this.activity.includes('digging') || this.activity.includes('collecting')) && !this.bucket) {
+  this.createBucket();
+  this.createPersonalSandcastle();
 }
 }
 
 update(deltaTime) {
+if (!CONFIG.animatePeople) return;
+
 this.time += deltaTime * 2;
 this.changeTimer += deltaTime;
 this.animPhase += deltaTime * 4;
+this.activityTimer += deltaTime;
 
-if (this.activity === 'walking' && CONFIG.animatePeople) {
-  // Walking animation
-  const walkCycle = Math.sin(this.animPhase);
-  if (this.limbRefs.thighL) this.limbRefs.thighL.rotation.x = walkCycle * 0.4;
-  if (this.limbRefs.thighR) this.limbRefs.thighR.rotation.x = -walkCycle * 0.4;
-  if (this.limbRefs.upperArmL) this.limbRefs.upperArmL.rotation.x = -walkCycle * 0.3;
-  if (this.limbRefs.upperArmR) this.limbRefs.upperArmR.rotation.x = walkCycle * 0.3;
+// Check if time to change activity (5-60 seconds)
+if (this.activityTimer >= this.activityDuration) {
+  this.changeActivity();
+}
+
+const cycle = Math.sin(this.animPhase);
+const fastCycle = Math.sin(this.animPhase * 2);
+const slowCycle = Math.sin(this.animPhase * 0.5);
+
+// Movement activities
+const movementActivities = ['walking_slow', 'walking_fast', 'jogging', 'running', 'sprinting', 'skipping', 'hopping', 'wading', 'walking_in_water'];
+const isMoving = movementActivities.includes(this.activity);
+
+if (isMoving) {
+  // Walking/running animation with speed variation
+  let speedMult = 1;
+  if (this.activity === 'walking_slow') speedMult = 0.5;
+  else if (this.activity === 'walking_fast') speedMult = 1.2;
+  else if (this.activity === 'jogging') speedMult = 1.8;
+  else if (this.activity === 'running') speedMult = 2.5;
+  else if (this.activity === 'sprinting') speedMult = 3.5;
+  else if (this.activity === 'wading' || this.activity === 'walking_in_water') speedMult = 0.4;
   
+  const walkCycle = Math.sin(this.animPhase * speedMult);
+  if (this.limbRefs.thighL) this.limbRefs.thighL.rotation.x = walkCycle * 0.4 * speedMult;
+  if (this.limbRefs.thighR) this.limbRefs.thighR.rotation.x = -walkCycle * 0.4 * speedMult;
+  if (this.limbRefs.upperArmL) this.limbRefs.upperArmL.rotation.x = -walkCycle * 0.3 * speedMult;
+  if (this.limbRefs.upperArmR) this.limbRefs.upperArmR.rotation.x = walkCycle * 0.3 * speedMult;
+  
+  // Direction change
   if (this.changeTimer > 4) {
     this.changeTimer = 0;
     this.direction = new THREE.Vector2(Math.random() * 2 - 1, Math.random() * 2 - 1).normalize();
   }
-  this.velocity.x = this.direction.x * this.speed;
-  this.velocity.z = this.direction.y * this.speed;
+  
+  const moveSpeed = this.speed * speedMult * 0.5;
+  this.velocity.x = this.direction.x * moveSpeed;
+  this.velocity.z = this.direction.y * moveSpeed;
   this.position.x += this.velocity.x * deltaTime;
   this.position.z += this.velocity.z * deltaTime;
   
-  // Keep in bounds - don't go into water
+  // Keep in bounds
+  const inWater = this.position.z > -18;
   if (Math.abs(this.position.x) > 70) {
     this.position.x = Math.sign(this.position.x) * 70;
     this.direction.x *= -1;
   }
-  if (this.position.z > -18 || this.position.z < -55) {
-    this.position.z = Math.max(-55, Math.min(-18, this.position.z));
-    this.direction.y *= -1;
+  if (inWater) {
+    if (this.position.z > 50 || this.position.z < -15) {
+      this.position.z = Math.max(-15, Math.min(50, this.position.z));
+      this.direction.y *= -1;
+    }
+  } else {
+    if (this.position.z > -20 || this.position.z < -55) {
+      this.position.z = Math.max(-55, Math.min(-20, this.position.z));
+      this.direction.y *= -1;
+    }
   }
   
   if (this.velocity.length() > 0.05) {
@@ -1791,78 +2150,145 @@ if (this.activity === 'walking' && CONFIG.animatePeople) {
   }
 }
 
+// Dancing animations
+if (this.activity === 'dancing' || this.activity === 'hula_dance') {
+  if (this.limbRefs.upperArmL) this.limbRefs.upperArmL.rotation.x = -1.0 + cycle * 0.4;
+  if (this.limbRefs.upperArmR) this.limbRefs.upperArmR.rotation.x = -1.0 - cycle * 0.4;
+  if (this.limbRefs.thighL) this.limbRefs.thighL.rotation.x = cycle * 0.15;
+  if (this.limbRefs.thighR) this.limbRefs.thighR.rotation.x = -cycle * 0.15;
+  this.mesh.rotation.y += deltaTime * (this.activity === 'hula_dance' ? 0.3 : 0.5);
+}
+
+// Swimming animations
+if (this.activity === 'swimming' || this.activity === 'swimming_backstroke' || this.activity === 'swimming_breaststroke') {
+  if (this.limbRefs.upperArmL) this.limbRefs.upperArmL.rotation.x = -1.2 + cycle * 1.0;
+  if (this.limbRefs.upperArmR) this.limbRefs.upperArmR.rotation.x = 0.5 - cycle * 1.0;
+  if (this.limbRefs.thighL) this.limbRefs.thighL.rotation.x = fastCycle * 0.3;
+  if (this.limbRefs.thighR) this.limbRefs.thighR.rotation.x = -fastCycle * 0.3;
+  // Move through water
+  this.position.x += Math.sin(this.mesh.rotation.y) * deltaTime * 0.5;
+  this.position.z += Math.cos(this.mesh.rotation.y) * deltaTime * 0.5;
+}
+
+// Treading water
+if (this.activity === 'treading_water') {
+  if (this.limbRefs.upperArmL) this.limbRefs.upperArmL.rotation.x = -0.6 + cycle * 0.3;
+  if (this.limbRefs.upperArmR) this.limbRefs.upperArmR.rotation.x = -0.6 - cycle * 0.3;
+  if (this.limbRefs.thighL) this.limbRefs.thighL.rotation.x = fastCycle * 0.4;
+  if (this.limbRefs.thighR) this.limbRefs.thighR.rotation.x = -fastCycle * 0.4;
+}
+
+// Splashing
+if (this.activity === 'splashing' || this.activity === 'playing_in_waves') {
+  if (this.limbRefs.upperArmL) this.limbRefs.upperArmL.rotation.x = -0.8 + fastCycle * 0.5;
+  if (this.limbRefs.upperArmR) this.limbRefs.upperArmR.rotation.x = -0.8 - fastCycle * 0.5;
+  // Create splash particles
+  if (Math.random() < 0.1 && particleSystem) {
+    particleSystem.createSplash(this.position.x, 0, this.position.z, 0.5);
+  }
+}
+
+// Jumping
+if (this.activity === 'jumping' || this.activity === 'jumping_waves') {
+  const jumpPhase = Math.abs(Math.sin(this.animPhase * 1.5));
+  this.mesh.position.y = this.position.y + jumpPhase * 0.5;
+  if (this.limbRefs.upperArmL) this.limbRefs.upperArmL.rotation.x = -1.2 - jumpPhase * 0.5;
+  if (this.limbRefs.upperArmR) this.limbRefs.upperArmR.rotation.x = -1.2 - jumpPhase * 0.5;
+}
+
+// Waving
+if (this.activity === 'waving') {
+  if (this.limbRefs.upperArmR) this.limbRefs.upperArmR.rotation.x = -1.5;
+  if (this.limbRefs.forearmR) this.limbRefs.forearmR.rotation.z = cycle * 0.4;
+}
+
+// Stretching
+if (this.activity === 'stretching') {
+  if (this.limbRefs.upperArmL) this.limbRefs.upperArmL.rotation.x = -2.5 + slowCycle * 0.3;
+  if (this.limbRefs.upperArmR) this.limbRefs.upperArmR.rotation.x = -2.5 + slowCycle * 0.3;
+  this.mesh.rotation.z = slowCycle * 0.1;
+}
+
+// Exercise animations
+if (this.activity === 'doing_pushups') {
+  const pushupPhase = Math.abs(Math.sin(this.animPhase * 0.8));
+  this.mesh.position.y = this.position.y - 0.5 + pushupPhase * 0.15;
+  if (this.limbRefs.upperArmL) this.limbRefs.upperArmL.rotation.x = -0.8 + pushupPhase * 0.4;
+  if (this.limbRefs.upperArmR) this.limbRefs.upperArmR.rotation.x = -0.8 + pushupPhase * 0.4;
+}
+
+if (this.activity === 'doing_situps') {
+  const situpPhase = Math.sin(this.animPhase * 0.6);
+  this.mesh.rotation.x = -0.8 + situpPhase * 0.6;
+}
+
 // Sandcastle building animation
-if (this.activity === 'building' && CONFIG.animatePeople) {
+if (this.activity === 'building_sandcastle' || this.activity === 'digging_sand' || this.activity === 'building_moat') {
   this.buildingProgress += deltaTime * 0.3;
-  const cycle = Math.sin(this.animPhase * 0.5);
   
-  // Arm animation: reach down, scoop, lift, place
   if (this.buildingState === 0) {
-    // Gathering sand - reach down
+    // Gathering sand
     if (this.limbRefs.upperArmR) {
       this.limbRefs.upperArmR.rotation.x = -0.8 + cycle * 0.3;
       this.limbRefs.upperArmR.rotation.z = -0.5;
     }
-    if (this.limbRefs.forearmR) {
-      this.limbRefs.forearmR.rotation.x = -0.5 + cycle * 0.2;
-    }
     if (this.bucketSand) this.bucketSand.visible = false;
-    
     if (this.buildingProgress > 2) {
       this.buildingState = 1;
       this.buildingProgress = 0;
       if (this.bucketSand) this.bucketSand.visible = true;
     }
   } else if (this.buildingState === 1) {
-    // Lifting and placing - arms move up and forward
+    // Placing
     if (this.limbRefs.upperArmR) {
       this.limbRefs.upperArmR.rotation.x = -0.3 + cycle * 0.2;
-      this.limbRefs.upperArmR.rotation.z = -0.3;
     }
     if (this.bucket) {
       this.bucket.position.y = 0.1 + Math.abs(cycle) * 0.15;
-      this.bucket.position.z = 0.3 + Math.abs(cycle) * 0.1;
     }
-    
     if (this.buildingProgress > 2) {
       this.buildingState = 2;
       this.buildingProgress = 0;
-      // Grow the sandcastle
-      if (this.castleTower) {
-        this.castleTower.scale.y = Math.min(1, this.castleTower.scale.y + 0.25);
-      }
+      if (this.castleTower) this.castleTower.scale.y = Math.min(1, this.castleTower.scale.y + 0.25);
       if (this.castleTop && this.castleTower && this.castleTower.scale.y >= 0.8) {
         this.castleTop.scale.y = Math.min(1, this.castleTop.scale.y + 0.3);
       }
     }
   } else {
-    // Patting/shaping - small arm movements
-    if (this.limbRefs.upperArmR) {
-      this.limbRefs.upperArmR.rotation.x = -0.5 + cycle * 0.15;
-    }
-    if (this.limbRefs.upperArmL) {
-      this.limbRefs.upperArmL.rotation.x = -0.5 - cycle * 0.15;
-    }
-    if (this.bucket) {
-      this.bucket.position.y = 0;
-      this.bucket.position.z = 0.2;
-    }
+    // Patting
+    if (this.limbRefs.upperArmR) this.limbRefs.upperArmR.rotation.x = -0.5 + cycle * 0.15;
+    if (this.limbRefs.upperArmL) this.limbRefs.upperArmL.rotation.x = -0.5 - cycle * 0.15;
+    if (this.bucket) this.bucket.position.y = 0;
     if (this.bucketSand) this.bucketSand.visible = false;
-    
     if (this.buildingProgress > 1.5) {
       this.buildingState = 0;
       this.buildingProgress = 0;
     }
   }
   
-  // Update sandcastle world position
   if (this.mySandcastle) {
-    this.mySandcastle.position.set(
-      this.position.x + 0.5,
-      -0.55,
-      this.position.z + 0.4
-    );
+    this.mySandcastle.position.set(this.position.x + 0.5, -0.55, this.position.z + 0.4);
   }
+}
+
+// Yoga/meditation gentle movement
+if (this.activity === 'yoga_pose' || this.activity === 'meditating') {
+  this.mesh.position.y = this.position.y + Math.sin(this.time * 0.5) * 0.02;
+}
+
+// Talking/laughing
+if (this.activity === 'talking' || this.activity === 'laughing') {
+  if (this.limbRefs.upperArmL) this.limbRefs.upperArmL.rotation.x = 0.2 + cycle * 0.15;
+  if (this.limbRefs.upperArmR) this.limbRefs.upperArmR.rotation.x = 0.3 - cycle * 0.15;
+  if (this.activity === 'laughing') {
+    this.mesh.rotation.x = Math.sin(this.animPhase * 3) * 0.05;
+  }
+}
+
+// Floating in water
+if (this.activity === 'floating') {
+  this.mesh.position.y = this.position.y + Math.sin(this.time) * 0.1;
+  this.position.x += Math.sin(this.time * 0.3) * 0.01;
 }
 
 // Update height based on location
@@ -1871,15 +2297,27 @@ if (this.position.z < -15) {
   // On beach
   baseY = -0.5;
 } else {
-  // In water
+  // In water - bob with waves
   const waveHeight = (ocean && ocean.getHeightAt) ? ocean.getHeightAt(this.position.x, this.position.z) : 0;
   baseY = waveHeight - 0.3 + Math.sin(this.time) * 0.1;
+  
+  // Create ripples when moving in water
+  if (isMoving && particleSystem && Math.random() < 0.05) {
+    particleSystem.createSplash(this.position.x, waveHeight, this.position.z, 0.2);
+  }
 }
 
-if (this.activity !== 'lying') {
+// Don't override Y for lying poses or jumping
+const lyingActivities = ['lying_back', 'lying_front', 'lying_side', 'making_sand_angel', 'floating', 'swimming', 'swimming_backstroke', 'swimming_breaststroke', 'snorkeling', 'bodyboarding', 'doggy_paddle'];
+const jumpingActivities = ['jumping', 'jumping_waves', 'doing_pushups'];
+
+if (!lyingActivities.includes(this.activity) && !jumpingActivities.includes(this.activity)) {
   this.position.y = baseY;
+  this.mesh.position.y = baseY;
 }
-this.mesh.position.copy(this.position);
+
+this.mesh.position.x = this.position.x;
+this.mesh.position.z = this.position.z;
 }
 
 remove() {
@@ -2128,6 +2566,49 @@ Math.random() * 2 + 1,
 ),
 life: 2000
 });
+}
+}
+
+// Create splash at specific location with intensity
+createSplash(x, y, z, intensity = 1) {
+if (!CONFIG.showSplashes) return;
+
+const count = Math.floor(5 * intensity + Math.random() * 5 * intensity);
+for (let i = 0; i < count && this.particles.length < 1000; i++) {
+  const angle = Math.random() * Math.PI * 2;
+  const speed = (0.5 + Math.random() * 1.5) * intensity;
+  
+  this.particles.push({
+    position: new THREE.Vector3(
+      x + (Math.random() - 0.5) * 0.5,
+      y + Math.random() * 0.3,
+      z + (Math.random() - 0.5) * 0.5
+    ),
+    velocity: new THREE.Vector3(
+      Math.cos(angle) * speed,
+      (1 + Math.random() * 2) * intensity,
+      Math.sin(angle) * speed
+    ),
+    life: 1000 + Math.random() * 1000
+  });
+}
+}
+
+// Create ripple effect (more subtle)
+createRipple(x, y, z) {
+if (!CONFIG.showSplashes) return;
+
+for (let i = 0; i < 3 && this.particles.length < 1000; i++) {
+  const angle = Math.random() * Math.PI * 2;
+  this.particles.push({
+    position: new THREE.Vector3(x, y + 0.05, z),
+    velocity: new THREE.Vector3(
+      Math.cos(angle) * 0.3,
+      0.2,
+      Math.sin(angle) * 0.3
+    ),
+    life: 500 + Math.random() * 300
+  });
 }
 }
 
@@ -2708,7 +3189,23 @@ const deltaTime = Math.min((currentTime - lastTime) / 1000, 0.1);
 lastTime = currentTime;
 
 if (ocean) ocean.update(deltaTime);
-people.forEach(person => person.update(deltaTime));
+
+// Update people and create water disturbances
+people.forEach(person => {
+  person.update(deltaTime);
+  
+  // Create water disturbances when people are in water and moving
+  if (person.position.z > -15 && ocean) {
+    const isMoving = ['swimming', 'swimming_backstroke', 'swimming_breaststroke', 'doggy_paddle', 
+      'splashing', 'playing_in_waves', 'jumping_waves', 'wading', 'walking_in_water', 'treading_water']
+      .includes(person.activity);
+    
+    if (isMoving && Math.random() < 0.1) {
+      ocean.disturb(person.position.x, person.position.z, 0.3);
+    }
+  }
+});
+
 if (particleSystem) particleSystem.update(deltaTime);
 if (birdsSystem) birdsSystem.update(deltaTime);
 updateBeachBalls(deltaTime);
@@ -2742,7 +3239,24 @@ const LOADING_TIPS = [
 'Birds fly overhead in patterns.'
 ];
 
-function init() {
+function showSplashScreen() {
+const splash = document.getElementById('splash-screen');
+splash.classList.add('fade-in');
+
+// After splash displays for 3 seconds, fade it out
+setTimeout(() => {
+  splash.classList.remove('fade-in');
+  splash.classList.add('fade-out');
+  
+  // After fade out completes, hide and start loading
+  setTimeout(() => {
+    splash.style.display = 'none';
+    startLoading();
+  }, 1000);
+}, 3500);
+}
+
+function startLoading() {
 console.log('🏖️ Starting OceanLife Pro...');
 
 const progress = document.getElementById('progress');
@@ -2802,6 +3316,10 @@ showNotification('🏖️ Welcome to OceanLife Pro!');
 console.log('✓ OceanLife Pro ready!');
 }, 800);
 }, 1200);
+}
+
+function init() {
+showSplashScreen();
 }
 
 // Start when DOM is ready
