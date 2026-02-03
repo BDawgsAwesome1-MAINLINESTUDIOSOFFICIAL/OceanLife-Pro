@@ -635,7 +635,7 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.1;
+renderer.toneMappingExposure = 1.2;
 renderer.outputEncoding = THREE.sRGBEncoding;
 document.body.appendChild(renderer.domElement);
 
@@ -662,12 +662,13 @@ scene.add(ambientLight);
 sunLight = new THREE.DirectionalLight(0xffffff, 1.5);
 sunLight.position.set(50, 80, 30);
 sunLight.castShadow = true;
-sunLight.shadow.mapSize.width = 2048;
-sunLight.shadow.mapSize.height = 2048;
+sunLight.shadow.mapSize.width = 4096;
+sunLight.shadow.mapSize.height = 4096;
 sunLight.shadow.camera.left = -150;
 sunLight.shadow.camera.right = 150;
 sunLight.shadow.camera.top = 150;
 sunLight.shadow.camera.bottom = -150;
+sunLight.shadow.bias = -0.0001;
 scene.add(sunLight);
 
 skyLight = new THREE.HemisphereLight(0x87CEEB, 0xf0e68c, 0.6);
@@ -728,116 +729,98 @@ scene.fog.density = isDay ? 0.012 : 0.025;
 }
 
 // ==========================================
-// PARTICLE WATER SYSTEM (LOW PERFORMANCE MODE)
+// PARTICLE WATER SYSTEM (100x MORE PARTICLES, BETTER WAVES)
 // ==========================================
 
 class ParticleWaterSystem {
 constructor() {
-console.log('Creating particle water system...');
-this.particles = [];
-this.gridSize = 50;
-this.particleSize = 0.35;
-this.spacing = 2.5;
+console.log('Creating particle water system (250k points)...');
+this.time = 0;
+this.gridSize = 500;
+this.spacing = 0.3;
+const total = this.gridSize * this.gridSize;
 
-// Create particle grid
-const geometry = new THREE.SphereGeometry(this.particleSize, 6, 6);
-const material = new THREE.MeshPhongMaterial({
-color: 0x0088cc,
+const positions = new Float32Array(total * 3);
+const colors = new Float32Array(total * 3);
+let i = 0;
+for (let gz = 0; gz < this.gridSize; gz++) {
+for (let gx = 0; gx < this.gridSize; gx++) {
+const x = (gx - this.gridSize / 2) * this.spacing;
+const z = (gz - this.gridSize / 2) * this.spacing;
+positions[i++] = x;
+positions[i++] = 0;
+positions[i++] = z;
+const depth = 0.4 + 0.5 * (1 + Math.sin(x * 0.02) * Math.cos(z * 0.02));
+colors[i - 3] = 0.0;
+colors[i - 2] = 0.35 * depth;
+colors[i - 1] = 0.6 * depth;
+}
+}
+
+const geometry = new THREE.BufferGeometry();
+geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+const material = new THREE.PointsMaterial({
+size: 0.2,
 transparent: true,
-opacity: 0.7,
-shininess: 100
+opacity: 0.85,
+vertexColors: true,
+sizeAttenuation: true,
+depthWrite: true
 });
 
-for (let x = 0; x < this.gridSize; x++) {
-for (let z = 0; z < this.gridSize; z++) {
-const mesh = new THREE.Mesh(geometry, material);
-const posX = (x - this.gridSize / 2) * this.spacing;
-const posZ = (z - this.gridSize / 2) * this.spacing;
-
-mesh.position.set(posX, 0, posZ);
-mesh.castShadow = true;
-mesh.receiveShadow = true;
-
-scene.add(mesh);
-
-this.particles.push({
-mesh: mesh,
-velocity: 0,
-baseY: 0,
-gridX: x,
-gridZ: z,
-phase: Math.random() * Math.PI * 2
-});
-}
+this.points = new THREE.Points(geometry, material);
+this.points.frustumCulled = false;
+scene.add(this.points);
+this.positionArray = positions;
+console.log(`Created ${total} water particles ✓`);
 }
 
-console.log(`Created ${this.particles.length} water particles ✓`);
+waveHeight(x, z, t) {
+const k = CONFIG.waveIntensity;
+const s = CONFIG.waveSpeed * t;
+return (
+Math.sin(x * 0.04 + s) * k +
+Math.sin(z * 0.035 + s * 0.87) * k * 0.85 +
+Math.sin((x + z) * 0.025 + s * 1.1) * k * 0.6 +
+Math.sin(x * 0.08 - z * 0.03 + s * 0.7) * k * 0.4 +
+Math.sin((x - z) * 0.02 + s * 1.3) * k * 0.35 +
+Math.sin(x * 0.015 + z * 0.02 + s * 0.5) * k * 0.25
+);
 }
 
 update(deltaTime) {
-const time = performance.now() * 0.001 * CONFIG.waveSpeed;
+this.time += deltaTime;
+const t = this.time;
+const pos = this.positionArray;
+const gs = this.gridSize;
+const sp = this.spacing;
 
-this.particles.forEach(p => {
-// Wave physics
-const x = p.gridX - this.gridSize / 2;
-const z = p.gridZ - this.gridSize / 2;
+for (let gz = 0; gz < gs; gz++) {
+for (let gx = 0; gx < gs; gx++) {
+const idx = (gz * gs + gx) * 3;
+const x = pos[idx];
+const z = pos[idx + 2];
+pos[idx + 1] = this.waveHeight(x, z, t);
+}
+}
 
-const wave1 = Math.sin(x * 0.15 + time + p.phase) * CONFIG.waveIntensity;
-const wave2 = Math.sin(z * 0.12 + time * 0.8) * CONFIG.waveIntensity * 0.7;
-const wave3 = Math.sin((x + z) * 0.08 + time * 1.2) * CONFIG.waveIntensity * 0.5;
-
-const targetY = wave1 + wave2 + wave3;
-
-// Apply physics
-const force = (targetY - p.mesh.position.y) * 0.1;
-p.velocity += force;
-p.velocity *= 0.95; // Damping
-
-p.mesh.position.y += p.velocity;
-});
+this.points.geometry.attributes.position.needsUpdate = true;
 }
 
 getHeightAt(x, z) {
-// Find nearest particle
-const gridX = Math.round((x / this.spacing) + this.gridSize / 2);
-const gridZ = Math.round((z / this.spacing) + this.gridSize / 2);
-
-if (gridX >= 0 && gridX < this.gridSize && gridZ >= 0 && gridZ < this.gridSize) {
-const index = gridZ * this.gridSize + gridX;
-if (this.particles[index]) {
-return this.particles[index].mesh.position.y;
-}
-}
-return 0;
+return this.waveHeight(x, z, this.time);
 }
 
 disturb(x, z, strength) {
-const gridX = Math.round((x / this.spacing) + this.gridSize / 2);
-const gridZ = Math.round((z / this.spacing) + this.gridSize / 2);
-const radius = 5;
-
-for (let dx = -radius; dx <= radius; dx++) {
-for (let dz = -radius; dz <= radius; dz++) {
-const gx = gridX + dx;
-const gz = gridZ + dz;
-
-if (gx >= 0 && gx < this.gridSize && gz >= 0 && gz < this.gridSize) {
-const dist = Math.sqrt(dx * dx + dz * dz);
-if (dist <= radius) {
-const index = gz * this.gridSize + gx;
-if (this.particles[index]) {
-const falloff = 1 - (dist / radius);
-this.particles[index].velocity += strength * falloff;
-}
-}
-}
-}
-}
+// Visual only - wave formula handles motion
 }
 
 remove() {
-this.particles.forEach(p => scene.remove(p.mesh));
-this.particles = [];
+scene.remove(this.points);
+this.points.geometry.dispose();
+this.points.material.dispose();
 }
 }
 
@@ -847,20 +830,20 @@ this.particles = [];
 
 class MeshWaterSystem {
 constructor() {
-console.log('Creating mesh water system...');
+console.log('Creating hyperrealistic mesh water system...');
 this.time = 0;
 
-const geometry = new THREE.PlaneGeometry(150, 150, 64, 64);
+const w = 150, h = 150;
+const geometry = new THREE.PlaneGeometry(w, h, 128, 128);
 geometry.rotateX(-Math.PI / 2);
 
-// Use Phong material so water is always visible (transmission is unreliable in r128)
 const material = new THREE.MeshPhongMaterial({
-color: 0x0088cc,
-emissive: 0x002244,
-specular: 0x88ccff,
-shininess: 80,
+color: 0x0066aa,
+emissive: 0x001a33,
+specular: 0xbbeeff,
+shininess: 140,
 transparent: true,
-opacity: 0.92,
+opacity: 0.94,
 side: THREE.DoubleSide,
 depthWrite: true,
 flatShading: false
@@ -874,23 +857,32 @@ this.mesh.renderOrder = 0;
 scene.add(this.mesh);
 
 this.originalPositions = geometry.attributes.position.array.slice();
-console.log('Mesh water created ✓');
+console.log('Hyperrealistic mesh water created ✓');
+}
+
+waveHeight(x, z, t) {
+const k = CONFIG.waveIntensity;
+const s = CONFIG.waveSpeed * t;
+return (
+Math.sin(x * 0.04 + s) * k +
+Math.sin(z * 0.035 + s * 0.87) * k * 0.85 +
+Math.sin((x + z) * 0.025 + s * 1.1) * k * 0.6 +
+Math.sin(x * 0.08 - z * 0.03 + s * 0.7) * k * 0.4 +
+Math.sin((x - z) * 0.02 + s * 1.3) * k * 0.35 +
+Math.sin(x * 0.015 + z * 0.02 + s * 0.5) * k * 0.25
+);
 }
 
 update(deltaTime) {
-this.time += deltaTime * CONFIG.waveSpeed;
+this.time += deltaTime;
 const positions = this.mesh.geometry.attributes.position.array;
+const t = this.time;
 
 for (let i = 0; i < positions.length / 3; i++) {
 const idx = i * 3;
 const x = this.originalPositions[idx];
 const z = this.originalPositions[idx + 2];
-
-const wave1 = Math.sin(x * 0.05 + this.time) * CONFIG.waveIntensity;
-const wave2 = Math.sin(z * 0.04 + this.time * 0.7) * CONFIG.waveIntensity * 0.7;
-const wave3 = Math.sin((x + z) * 0.03 + this.time * 1.2) * CONFIG.waveIntensity * 0.5;
-
-positions[idx + 1] = wave1 + wave2 + wave3;
+positions[idx + 1] = this.waveHeight(x, z, t);
 }
 
 this.mesh.geometry.attributes.position.needsUpdate = true;
@@ -898,11 +890,7 @@ this.mesh.geometry.computeVertexNormals();
 }
 
 getHeightAt(x, z) {
-const t = this.time;
-const wave1 = Math.sin(x * 0.05 + t) * CONFIG.waveIntensity;
-const wave2 = Math.sin(z * 0.04 + t * 0.7) * CONFIG.waveIntensity * 0.7;
-const wave3 = Math.sin((x + z) * 0.03 + t * 1.2) * CONFIG.waveIntensity * 0.5;
-return wave1 + wave2 + wave3;
+return this.waveHeight(x, z, this.time);
 }
 
 disturb(x, z, strength) {
@@ -995,34 +983,78 @@ this.createMesh();
 
 createMesh() {
 const group = new THREE.Group();
-const skinColor = [0xffdab9, 0xf0c090, 0xd4a76a, 0xa67c52][Math.floor(Math.random() * 4)];
-const bodyMat = new THREE.MeshPhongMaterial({ color: skinColor, shininess: 20, specular: 0x332211 });
+const skinColors = [0xffe4c9, 0xffd4b8, 0xe8c4a8, 0xd4a574, 0xc4956a, 0xa67c52];
+const skinColor = skinColors[Math.floor(Math.random() * skinColors.length)];
+const bodyMat = new THREE.MeshStandardMaterial({
+color: skinColor,
+roughness: 0.75,
+metalness: 0.05
+});
 
-// Torso: cylinder (works in all Three.js versions)
-const bodyGeo = new THREE.CylinderGeometry(0.35, 0.4, 1.0, 8);
+// Torso
+const bodyGeo = new THREE.CylinderGeometry(0.28, 0.32, 0.75, 12);
 const body = new THREE.Mesh(bodyGeo, bodyMat);
-body.position.y = 0.2;
+body.position.y = 0.15;
 body.castShadow = true;
 body.receiveShadow = true;
 group.add(body);
 
-const headGeo = new THREE.SphereGeometry(0.32, 10, 10);
+// Head (proportional)
+const headGeo = new THREE.SphereGeometry(0.22, 14, 14);
 const head = new THREE.Mesh(headGeo, bodyMat);
-head.position.y = 0.85;
+head.position.y = 0.58;
 head.castShadow = true;
 head.receiveShadow = true;
 group.add(head);
 
-const swimColor = [0xff6b6b, 0x4ecdc4, 0x45b7d1, 0xf9ca24][Math.floor(Math.random() * 4)];
-const swimMat = new THREE.MeshPhongMaterial({ color: swimColor, shininess: 30 });
-const swimGeo = new THREE.BoxGeometry(0.7, 0.25, 0.4);
+// Hair
+const hairMat = new THREE.MeshStandardMaterial({ color: [0x3d2314, 0x5c4033, 0x2c1810, 0x4a3728][Math.floor(Math.random() * 4)], roughness: 0.9 });
+const hairGeo = new THREE.SphereGeometry(0.2, 8, 8, 0, Math.PI * 2, 0, Math.PI * 0.55);
+const hair = new THREE.Mesh(hairGeo, hairMat);
+hair.position.y = 0.65;
+hair.scale.set(1, 1.1, 0.95);
+hair.castShadow = true;
+group.add(hair);
+
+// Swimwear
+const swimColor = [0xff6b6b, 0x4ecdc4, 0x45b7d1, 0xf9ca24, 0xff8c42, 0x9b59b6][Math.floor(Math.random() * 6)];
+const swimMat = new THREE.MeshStandardMaterial({ color: swimColor, roughness: 0.5, metalness: 0 });
+const swimGeo = new THREE.CylinderGeometry(0.26, 0.28, 0.35, 10);
 const swim = new THREE.Mesh(swimGeo, swimMat);
-swim.position.y = -0.25;
+swim.position.y = -0.18;
+swim.rotation.x = Math.PI / 2;
 swim.castShadow = true;
 group.add(swim);
 
+// Arms (simple cylinders)
+const armGeo = new THREE.CylinderGeometry(0.04, 0.035, 0.35, 6);
+const armL = new THREE.Mesh(armGeo, bodyMat);
+armL.position.set(-0.28, 0.1, 0);
+armL.rotation.z = 0.4;
+armL.castShadow = true;
+group.add(armL);
+const armR = new THREE.Mesh(armGeo, bodyMat);
+armR.position.set(0.28, 0.1, 0);
+armR.rotation.z = -0.4;
+armR.castShadow = true;
+group.add(armR);
+
+// Legs
+const legGeo = new THREE.CylinderGeometry(0.06, 0.05, 0.4, 8);
+const legMat = new THREE.MeshStandardMaterial({ color: skinColor, roughness: 0.8 });
+const legL = new THREE.Mesh(legGeo, legMat);
+legL.position.set(-0.1, -0.42, 0.05);
+legL.rotation.x = 0.15;
+legL.castShadow = true;
+group.add(legL);
+const legR = new THREE.Mesh(legGeo, legMat);
+legR.position.set(0.1, -0.42, 0.05);
+legR.rotation.x = 0.15;
+legR.castShadow = true;
+group.add(legR);
+
 group.position.copy(this.position);
-group.scale.setScalar(1.2);
+group.scale.setScalar(1.15);
 group.visible = true;
 scene.add(group);
 this.mesh = group;
@@ -1230,7 +1262,7 @@ if (ocean) ocean.remove();
 if (mode === 'particle') {
 ocean = new ParticleWaterSystem();
 document.getElementById('currentMode').textContent = 'PARTICLE';
-document.getElementById('waterType').textContent = 'Spheres';
+document.getElementById('waterType').textContent = '250k Points';
 } else {
 ocean = new MeshWaterSystem();
 document.getElementById('currentMode').textContent = 'ULTRA';
