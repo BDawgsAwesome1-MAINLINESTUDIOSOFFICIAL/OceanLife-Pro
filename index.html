@@ -736,11 +736,11 @@ constructor() {
 console.log('Creating particle water system...');
 this.particles = [];
 this.gridSize = 50;
-this.particleSize = 1.2;
+this.particleSize = 0.35;
 this.spacing = 2.5;
 
 // Create particle grid
-const geometry = new THREE.SphereGeometry(this.particleSize, 8, 8);
+const geometry = new THREE.SphereGeometry(this.particleSize, 6, 6);
 const material = new THREE.MeshPhongMaterial({
 color: 0x0088cc,
 transparent: true,
@@ -1097,7 +1097,7 @@ geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
 geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 
 const material = new THREE.PointsMaterial({
-size: 0.4,
+size: 0.12,
 transparent: true,
 opacity: 0.8,
 vertexColors: true,
